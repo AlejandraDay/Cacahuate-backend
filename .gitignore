@@ -1,0 +1,60 @@
+# Build output
+bin/
+obj/
+out/
+
+# .NET / Visual Studio
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+*.vspscc
+*.vssscc
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+NuGetFallbackFolder
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# Environment / secrets
+.env
+.env.*
+appsettings.Development.json
+appsettings.Local.json
+**/secrets.json
+
+# Logs
+logs/
+*.log
+*.trace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code
+.claude/
+
+# Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml

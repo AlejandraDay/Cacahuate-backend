@@ -1,0 +1,782 @@
+================================================================
+CACAHUATE SOFT PROJECT — ESTRUCTURA DE BASE DE DATOS Y BACKEND
+================================================================
+Fecha: 2026-05-26
+Tecnologias: .NET 9, Entity Framework Core 9, PostgreSQL, JWT
+
+
+================================================================
+1. ESTRUCTURA DE PROYECTOS (CLEAN ARCHITECTURE)
+================================================================
+
+Cacahuate/
+├── Cacahuate.Shared        DTOs y Enums compartidos entre proyectos
+├── Cacahuate.DataAccess    Entidades, DbContext, Repositorios
+├── Cacahuate.Services      Logica de negocio
+└── Cacahuate.API           Controllers, configuracion, punto de entrada
+
+Flujo de dependencias (una sola direccion):
+  API --> Services --> DataAccess --> Shared
+
+Cada capa solo conoce la capa inmediata debajo de ella.
+Esto permite cambiar implementaciones sin romper el resto.
+
+
+================================================================
+2. BASE DE DATOS — TABLAS Y RELACIONES
+================================================================
+
+-------------------------------
+TABLA: Users
+-------------------------------
+Id                 GUID (PK)
+FirstName          TEXT
+LastName           TEXT
+Email              TEXT (UNIQUE)
+PasswordHash       TEXT  -- guardado con BCrypt, nunca la contrasena real
+Role               TEXT  -- "Admin" | "Therapist" | "Parent"
+IsActive           BOOL
+CreatedAt          TIMESTAMP
+
+Relaciones:
+  Users 1:1 --> Therapists  (si Role = Therapist)
+  Users 1:1 --> Parents     (si Role = Parent)
+
+Nota: Al registrarse como Therapist, automaticamente se crea un registro
+en Therapists. Lo mismo para Parent. Esto permite que User sea generico
+y cada rol tenga su propio perfil extendido.
+
+-------------------------------
+TABLA: Therapists
+-------------------------------
+Id                     GUID (PK)
+UserId                 GUID (FK --> Users)
+Bio                    TEXT (opcional)
+SessionDurationMinutes INT  -- duracion por defecto de sesion (default 60)
+IsActive               BOOL
+
+Relaciones:
+  Therapists 1:N --> TherapistAvailabilities
+  Therapists 1:N --> Appointments
+
+-------------------------------
+TABLA: Parents
+-------------------------------
+Id       GUID (PK)
+UserId   GUID (FK --> Users)
+
+Relaciones:
+  Parents 1:N --> Patients      -- el padre gestiona a sus pacientes
+  Parents 1:N --> Appointments  -- el padre agenda las citas
+
+-------------------------------
+TABLA: Patients
+-------------------------------
+Id            GUID (PK)
+ParentId      GUID (FK --> Parents)
+FirstName     TEXT
+LastName      TEXT
+DateOfBirth   DATE
+Notes         TEXT (opcional)
+IsActive      BOOL
+CreatedAt     TIMESTAMP
+
+IMPORTANTE: Los pacientes NO son usuarios del sistema.
+Son registros creados y gestionados por el padre (Parent).
+Un padre puede tener multiples pacientes (hijos).
+
+Relaciones:
+  Patients N:1 --> Parents
+  Patients 1:N --> Appointments
+
+-------------------------------
+TABLA: TherapistAvailabilities
+-------------------------------
+Id                     GUID (PK)
+TherapistId            GUID (FK --> Therapists)
+Date                   DATE       -- dia especifico de disponibilidad
+StartTime              TIME       -- hora de inicio del bloque
+EndTime                TIME       -- hora de fin del bloque
+SessionDurationMinutes INT        -- duracion de cada sesion en este bloque
+                                  -- puede ser diferente al default del terapeuta
+CreatedAt              TIMESTAMP
+
+Ejemplo: Un terapeuta puede crear el bloque:
+  Fecha: 2026-05-20, De 09:00 a 12:00, Sesiones de 60 min
+  Eso genera automaticamente 3 slots: 09-10, 10-11, 11-12
+
+IMPORTANTE: Los slots (horarios individuales) NO se guardan en la DB.
+Se calculan dinamicamente desde este bloque cada vez que se consultan.
+Esto hace la DB mas limpia y permite cambiar la duracion de sesion facilmente.
+
+Relaciones:
+  TherapistAvailabilities N:1 --> Therapists
+  TherapistAvailabilities 1:N --> Appointments
+
+-------------------------------
+TABLA: Appointments
+-------------------------------
+Id               GUID (PK)
+TherapistId      GUID (FK --> Therapists)
+PatientId        GUID (FK --> Patients)
+ParentId         GUID (FK --> Parents)
+AvailabilityId   GUID (FK --> TherapistAvailabilities)
+Date             DATE
+StartTime        TIME
+EndTime          TIME
+Status           TEXT -- "Pending" | "Confirmed" | "Cancelled" | "Completed"
+Notes            TEXT (opcional)
+CreatedAt        TIMESTAMP
+
+Cuando se reserva una cita:
+  - El estado inicial es "Confirmed" (no requiere aprobacion manual)
+  - La cita queda ligada al bloque de disponibilidad (AvailabilityId)
+  - Al consultar slots del bloque, este slot aparece como no disponible
+  - Solo el padre o el terapeuta de esa cita pueden cancelarla
+
+Relaciones (todas con DeleteBehavior.Restrict para no eliminar citas en cascada):
+  Appointments N:1 --> Therapists
+  Appointments N:1 --> Patients
+  Appointments N:1 --> Parents
+  Appointments N:1 --> TherapistAvailabilities
+
+
+================================================================
+3. DIAGRAMA DE RELACIONES SIMPLIFICADO
+================================================================
+
+Users (1) -----> (1) Therapists -----> (N) TherapistAvailabilities
+                           |                        |
+                           |                        v
+                           +-----------> (N) Appointments <-----+
+                                                   ^             |
+Users (1) -----> (1) Parents -----> (N) Patients --+             |
+                     |                                            |
+                     +--------------------------------------------+
+
+
+================================================================
+4. ESTRUCTURA DEL BACKEND — CAPAS
+================================================================
+
+-------------------------------
+CAPA: Cacahuate.Shared
+-------------------------------
+Contiene los objetos de transferencia (DTOs) que usa la API
+para recibir datos del cliente y para responder.
+
+DTOs de Autenticacion:
+  RegisterRequest   -- datos para crear cuenta (nombre, email, password, rol)
+  LoginRequest      -- email + password
+  LoginResponse     -- token JWT + info del usuario
+
+DTOs de Scheduling:
+  AvailabilityRequest    -- terapeuta define un bloque de disponibilidad
+  AvailabilityResponse   -- devuelve el bloque con sus slots calculados
+  TimeSlotResponse       -- un slot individual (hora inicio, fin, disponible?)
+  BookAppointmentRequest -- padre agenda una cita (terapeuta, paciente, fecha, hora)
+  AppointmentResponse    -- datos completos de una cita
+  PatientRequest         -- datos para crear un paciente
+  PatientResponse        -- datos del paciente con nombre del padre
+  TherapistListResponse  -- info basica del terapeuta para listados
+
+Enums:
+  UserRole             -- Admin | Therapist | Parent
+  AppointmentStatus    -- Pending | Confirmed | Cancelled | Completed
+
+-------------------------------
+CAPA: Cacahuate.DataAccess
+-------------------------------
+Contiene las entidades de la base de datos y los repositorios.
+
+AppDbContext:
+  Configura todas las relaciones entre entidades usando Fluent API.
+  Los enums (Role, Status) se guardan como string en la DB, no como numero.
+
+Repositorios (interfaz + implementacion para cada entidad):
+  IUserRepository / UserRepository
+  ITherapistRepository / TherapistRepository
+  IParentRepository / ParentRepository
+  IPatientRepository / PatientRepository
+  IAvailabilityRepository / AvailabilityRepository
+  IAppointmentRepository / AppointmentRepository
+    - Incluye SlotIsBookedAsync(availabilityId, startTime)
+      para verificar si un slot ya fue reservado antes de agendar
+
+-------------------------------
+CAPA: Cacahuate.Services
+-------------------------------
+Contiene la logica de negocio. Los controllers no tienen logica,
+solo llaman al servicio correspondiente.
+
+AuthService:
+  LoginAsync         -- verifica password con BCrypt, devuelve JWT
+  RegisterAsync      -- hashea password, crea User + perfil (Therapist o Parent)
+  BuildLoginResponse -- genera token JWT con claims: userId, email, rol, nombre completo
+                        Token valido por 8 horas
+
+SchedulingService:
+  AddAvailabilityAsync         -- terapeuta crea bloque de tiempo
+                                  Valida: EndTime > StartTime
+                                  Valida: bloque >= duracion de sesion
+  GetTherapistAvailabilityAsync -- lista todos los bloques de un terapeuta con slots
+                                  (recibe Therapist entity ID)
+  GetMyAvailabilityAsync        -- igual que el anterior pero recibe User ID del JWT
+                                  Resuelve internamente el Therapist entity ID
+  GetAvailabilityWithSlotsAsync -- detalle de un bloque con sus slots
+  BookAppointmentAsync          -- padre agenda cita
+                                  Valida: el paciente pertenece a ese padre
+                                  Valida: el slot existe en el bloque del terapeuta
+                                  Valida: el slot no esta ya reservado
+  GetAppointmentsByParentAsync  -- citas del padre autenticado
+  GetAppointmentsByTherapistAsync -- citas del terapeuta autenticado
+  CancelAppointmentAsync        -- cancela cita (solo padre o terapeuta de esa cita)
+  AddPatientAsync               -- padre crea un paciente
+  GetPatientsByParentAsync      -- lista pacientes del padre autenticado
+
+  BuildTimeSlots (privado):
+    Genera slots dinamicamente desde StartTime hasta EndTime
+    en incrementos de SessionDurationMinutes.
+    Marca cada slot como disponible o no segun las citas existentes.
+
+-------------------------------
+CAPA: Cacahuate.API
+-------------------------------
+Punto de entrada de la aplicacion. Recibe peticiones HTTP.
+
+Controllers:
+  AuthController      -- endpoints publicos de registro y login
+  SchedulingController -- endpoints de disponibilidad, citas y pacientes
+  TherapistController -- listado de terapeutas activos
+
+Program.cs:
+  - Registra DbContext con Npgsql (PostgreSQL)
+  - Registra todos los repositorios y servicios (Scoped)
+  - Configura JWT Bearer authentication
+  - Configura Swagger con soporte de token Bearer
+  - Al arrancar: ejecuta db.Database.Migrate() automaticamente
+    (crea la DB y aplica migraciones si no existen)
+
+
+================================================================
+5. ENDPOINTS DE LA API — DETALLES DE REQUEST Y RESPONSE
+================================================================
+
+-------------------------------
+AUTENTICACION
+-------------------------------
+Acceso: Público (sin token requerido)
+
+POST /api/auth/register
+  Descripcion: Crear nueva cuenta de usuario
+  
+  REQUEST (body):
+    {
+      "firstName": "string",
+      "lastName": "string", 
+      "email": "string",
+      "password": "string",
+      "role": number (0=Admin, 1=Therapist, 2=Parent)
+    }
+  
+  RESPONSE 200 (LoginResponse):
+    {
+      "token": "eyJhbGc...",        -- JWT válido por 8 horas
+      "email": "user@example.com",
+      "fullName": "Juan Pérez",
+      "role": "Parent"
+    }
+  
+  ERRORES:
+    400: Email ya existe
+    400: Validación fallida (password débil, email inválido)
+
+---
+
+POST /api/auth/login
+  Descripcion: Obtener token JWT (iniciar sesión)
+  
+  REQUEST (body):
+    {
+      "email": "string",
+      "password": "string"
+    }
+  
+  RESPONSE 200 (LoginResponse):
+    {
+      "token": "eyJhbGc...",
+      "email": "user@example.com",
+      "fullName": "Juan Pérez",
+      "role": "Parent"
+    }
+  
+  ERRORES:
+    401: Email o contraseña inválida
+    404: Usuario no encontrado
+
+-------------------------------
+TERAPEUTAS
+-------------------------------
+Acceso: Autenticado
+
+GET /api/therapist
+  Descripcion: Listar todos los terapeutas activos del sistema
+  
+  REQUEST: (sin parámetros)
+  
+  RESPONSE 200 (Array de Therapist):
+    [
+      {
+        "id": "uuid",
+        "firstName": "Carlos",
+        "lastName": "Sánchez",
+        "bio": "Especialista en terapia infantil",
+        "sessionDurationMinutes": 60,
+        "isActive": true
+      }
+    ]
+
+-------------------------------
+DISPONIBILIDAD
+-------------------------------
+Acceso: Autenticado
+
+POST /api/scheduling/availability
+  Descripcion: Crear bloque de disponibilidad (solo Therapist)
+
+  REQUEST (body):
+    {
+      "date": "2026-05-20",           -- formato YYYY-MM-DD
+      "startTime": "09:00",           -- formato HH:mm
+      "endTime": "12:00",
+      "sessionDurationMinutes": 60    -- duración de cada sesión
+    }
+
+  RESPONSE 201 (TherapistAvailability):
+    {
+      "id": "uuid",
+      "therapistId": "uuid",
+      "date": "2026-05-20",
+      "startTime": "09:00",
+      "endTime": "12:00",
+      "sessionDurationMinutes": 60,
+      "slots": [
+        {
+          "startTime": "09:00",
+          "endTime": "10:00",
+          "isAvailable": true
+        },
+        {
+          "startTime": "10:00",
+          "endTime": "11:00",
+          "isAvailable": true
+        },
+        {
+          "startTime": "11:00",
+          "endTime": "12:00",
+          "isAvailable": true
+        }
+      ]
+    }
+
+  ERRORES:
+    400: EndTime no es mayor que StartTime
+    400: Duración de sesión > duración del bloque
+    403: Solo Therapist puede crear disponibilidad
+
+---
+
+GET /api/scheduling/availability
+  Descripcion: Ver todos los bloques de disponibilidad del terapeuta autenticado (solo Therapist)
+  Nota: Resuelve el Therapist entity ID internamente desde el JWT (User ID).
+        Equivalente a GET /therapists/{id}/availability pero sin necesitar el Therapist ID.
+
+  REQUEST: (sin parámetros)
+
+  RESPONSE 200 (Array de TherapistAvailability):
+    [
+      {
+        "id": "uuid",
+        "therapistId": "uuid",
+        "date": "2026-05-20",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "sessionDurationMinutes": 60,
+        "slots": [ ... ]
+      }
+    ]
+
+  ERRORES:
+    403: Solo Therapist puede usar este endpoint
+    404: Terapeuta no encontrado
+
+---
+
+GET /api/scheduling/therapists/{therapistId}/availability
+  Descripcion: Listar todos los bloques del terapeuta con sus slots
+  
+  PARÁMETROS:
+    {therapistId} = uuid del terapeuta
+  
+  REQUEST: (sin body)
+  
+  RESPONSE 200 (Array de TherapistAvailability):
+    [
+      {
+        "id": "uuid",
+        "therapistId": "uuid",
+        "date": "2026-05-20",
+        "startTime": "09:00",
+        "endTime": "12:00",
+        "sessionDurationMinutes": 60,
+        "slots": [ ... ]
+      }
+    ]
+
+---
+
+GET /api/scheduling/availability/{availabilityId}
+  Descripcion: Ver detalles de un bloque específico con sus slots
+  
+  PARÁMETROS:
+    {availabilityId} = uuid del bloque
+  
+  REQUEST: (sin body)
+  
+  RESPONSE 200 (TherapistAvailability):
+    {
+      "id": "uuid",
+      "therapistId": "uuid",
+      "date": "2026-05-20",
+      "startTime": "09:00",
+      "endTime": "12:00",
+      "sessionDurationMinutes": 60,
+      "slots": [ ... ]
+    }
+  
+  ERRORES:
+    404: Bloque no encontrado
+
+-------------------------------
+CITAS (APPOINTMENTS)
+-------------------------------
+Acceso: Autenticado
+
+POST /api/scheduling/appointments
+  Descripcion: Agendar cita (solo Parent)
+  NOTA: La cita se crea en estado Pending y requiere aprobación del Admin
+  
+  REQUEST (body):
+    {
+      "therapistId": "uuid",
+      "patientId": "uuid",
+      "date": "2026-05-20",
+      "startTime": "09:00"
+    }
+  
+  RESPONSE 201 (Appointment):
+    {
+      "id": "uuid",
+      "therapistId": "uuid",
+      "patientId": "uuid",
+      "date": "2026-05-20",
+      "startTime": "09:00",
+      "endTime": "10:00",
+      "status": "Pending",
+      "notes": null
+    }
+  
+  ERRORES:
+    400: El paciente no pertenece a este padre
+    400: El slot ya está reservado
+    400: El slot no existe en el bloque del terapeuta
+    403: Solo Parent puede agendar citas
+    404: Terapeuta o paciente no encontrado
+
+---
+
+GET /api/scheduling/appointments/my
+  Descripcion: Listar citas del padre autenticado
+  
+  REQUEST: (sin parámetros)
+  
+  RESPONSE 200 (Array de Appointment):
+    [
+      {
+        "id": "uuid",
+        "therapistId": "uuid",
+        "patientId": "uuid",
+        "date": "2026-05-20",
+        "startTime": "09:00",
+        "endTime": "10:00",
+        "status": "Confirmed",
+        "notes": "Primera sesión"
+      }
+    ]
+  
+  ERRORES:
+    403: Solo Parent puede ver sus citas
+
+---
+
+GET /api/scheduling/appointments/therapist
+  Descripcion: Listar citas del terapeuta autenticado
+  
+  REQUEST: (sin parámetros)
+  
+  RESPONSE 200 (Array de Appointment):
+    [
+      {
+        "id": "uuid",
+        "therapistId": "uuid",
+        "patientId": "uuid",
+        "date": "2026-05-20",
+        "startTime": "09:00",
+        "endTime": "10:00",
+        "status": "Confirmed",
+        "notes": null
+      }
+    ]
+  
+  ERRORES:
+    403: Solo Therapist puede ver sus citas
+
+---
+
+PATCH /api/scheduling/appointments/{appointmentId}/cancel
+  Descripcion: Cancelar cita (solo Parent o Therapist de esa cita)
+  RESTRICCION: No se puede cancelar menos de 1 hora antes de la cita
+  
+  PARÁMETROS:
+    {appointmentId} = uuid de la cita
+  
+  REQUEST: (sin body)
+  
+  RESPONSE 200:
+    {
+      "message": "Cita cancelada exitosamente",
+      "appointmentId": "uuid",
+      "newStatus": "Cancelled"
+    }
+  
+  ERRORES:
+    400: No se puede cancelar con menos de 1 hora de anticipación
+    403: Solo el Parent o Therapist de esta cita pueden cancelarla
+    404: Cita no encontrada
+    409: La cita ya está cancelada o completada
+
+-------------------------------
+PACIENTES
+-------------------------------
+Acceso: Autenticado (Parent)
+
+POST /api/scheduling/patients
+  Descripcion: Crear nuevo paciente (solo Parent)
+  
+  REQUEST (body):
+    {
+      "firstName": "string",
+      "lastName": "string",
+      "dateOfBirth": "2018-03-15"     -- formato YYYY-MM-DD
+    }
+  
+  RESPONSE 201 (Patient):
+    {
+      "id": "uuid",
+      "firstName": "Juan",
+      "lastName": "Pérez",
+      "dateOfBirth": "2018-03-15"
+    }
+  
+  ERRORES:
+    403: Solo Parent puede crear pacientes
+
+---
+
+GET /api/scheduling/patients/my
+  Descripcion: Listar pacientes del padre autenticado
+  
+  REQUEST: (sin parámetros)
+  
+  RESPONSE 200 (Array de Patient):
+    [
+      {
+        "id": "uuid",
+        "firstName": "Juan",
+        "lastName": "Pérez",
+        "dateOfBirth": "2018-03-15"
+      }
+    ]
+  
+  ERRORES:
+    403: Solo Parent puede ver sus pacientes
+
+-------------------------------
+ADMINISTRACIÓN (ADMIN)
+-------------------------------
+Acceso: Autenticado (Admin)
+
+NOTA: Las citas se crean con Status=Confirmed directamente por el Parent.
+Estos endpoints son para que el Admin pueda cambiar el estado si es necesario.
+
+GET /api/scheduling/appointments/admin/pending
+  Descripcion: Listar todas las citas pendientes del sistema
+  
+  REQUEST: (sin parámetros)
+  
+  RESPONSE 200 (Array de Appointment):
+    [
+      {
+        "id": "uuid",
+        "therapistId": "uuid",
+        "therapistName": "Carlos Sánchez",
+        "patientId": "uuid",
+        "patientName": "Juan Pérez",
+        "date": "2026-05-20",
+        "startTime": "09:00",
+        "endTime": "10:00",
+        "status": "Pending",
+        "notes": null,
+        "createdAt": "2026-05-28T10:30:00Z"
+      }
+    ]
+  
+  ERRORES:
+    403: Solo Admin puede listar citas pendientes
+
+---
+
+PATCH /api/scheduling/appointments/{appointmentId}/confirm
+  Descripcion: Aprobar cita (cambiar de Pending a Confirmed)
+  
+  PARÁMETROS:
+    {appointmentId} = uuid de la cita
+  
+  REQUEST: (sin body)
+  
+  RESPONSE 200 (Appointment):
+    {
+      "id": "uuid",
+      "therapistId": "uuid",
+      "therapistName": "Carlos Sánchez",
+      "patientId": "uuid",
+      "patientName": "Juan Pérez",
+      "date": "2026-05-20",
+      "startTime": "09:00",
+      "endTime": "10:00",
+      "status": "Confirmed",
+      "notes": null,
+      "createdAt": "2026-05-28T10:30:00Z"
+    }
+  
+  ERRORES:
+    400: La cita no está en estado Pending
+    403: Solo Admin puede confirmar citas
+    404: Cita no encontrada
+
+---
+
+PATCH /api/scheduling/appointments/{appointmentId}/reject
+  Descripcion: Rechazar cita (cambiar de Pending a Cancelled)
+  
+  PARÁMETROS:
+    {appointmentId} = uuid de la cita
+  
+  REQUEST: (sin body)
+  
+  RESPONSE 200 (Appointment):
+    {
+      "id": "uuid",
+      "therapistId": "uuid",
+      "therapistName": "Carlos Sánchez",
+      "patientId": "uuid",
+      "patientName": "Juan Pérez",
+      "date": "2026-05-20",
+      "startTime": "09:00",
+      "endTime": "10:00",
+      "status": "Cancelled",
+      "notes": null,
+      "createdAt": "2026-05-28T10:30:00Z"
+    }
+  
+  ERRORES:
+    400: La cita no está en estado Pending
+    403: Solo Admin puede rechazar citas
+    404: Cita no encontrada
+
+
+================================================================
+6. FLUJO COMPLETO DE UNA CITA
+================================================================
+
+1. Registro:
+   Un terapeuta se registra en POST /api/auth/register con Role=Therapist.
+   Un padre se registra con Role=Parent.
+
+2. Login:
+   Ambos hacen login en POST /api/auth/login y reciben un token JWT.
+   Deben incluir ese token en el header de cada peticion:
+   Authorization: Bearer {token}
+
+3. Terapeuta define disponibilidad:
+   POST /api/scheduling/availability
+   Body: { "date": "2026-05-20", "startTime": "09:00", "endTime": "12:00", "sessionDurationMinutes": 60 }
+   Resultado: bloque guardado en TherapistAvailabilities
+
+4. Padre consulta disponibilidad:
+   GET /api/scheduling/therapists/{therapistId}/availability
+   Resultado: lista de bloques, cada uno con sus slots calculados
+   Ejemplo de slot: { "startTime": "09:00", "endTime": "10:00", "isAvailable": true }
+
+5. Padre registra su paciente (si no lo ha hecho):
+   POST /api/scheduling/patients
+   Body: { "firstName": "Juan", "lastName": "Perez", "dateOfBirth": "2018-03-15" }
+
+6. Padre agenda la cita:
+   POST /api/scheduling/appointments
+   Body: { "therapistId": "...", "patientId": "...", "date": "2026-05-20", "startTime": "09:00" }
+   Resultado: cita creada con Status=Pending (requiere aprobación)
+
+7. Admin aprueba o rechaza la cita:
+   PATCH /api/scheduling/appointments/{id}/confirm   -- para APROBAR (Pending → Confirmed)
+   PATCH /api/scheduling/appointments/{id}/reject     -- para RECHAZAR (Pending → Cancelled)
+   Admin puede ver todas las citas pendientes con:
+   GET /api/scheduling/appointments/admin/pending
+
+8. Cancelacion (si es necesario):
+   PATCH /api/scheduling/appointments/{id}/cancel
+   Puede hacerlo el padre o el terapeuta de esa cita (solo si ya está Confirmed).
+   RESTRICCION: No se puede cancelar con menos de 1 hora de anticipación.
+
+
+================================================================
+7. SEGURIDAD
+================================================================
+
+- Passwords: guardados con BCrypt (hash + salt), nunca en texto plano
+- Autenticacion: JWT con expiracion de 8 horas
+- Autorizacion por rol: cada endpoint verifica el rol del usuario
+- Validacion de propiedad: un padre solo puede agendar citas para sus propios pacientes
+- Sin doble reserva: antes de crear una cita se verifica que el slot no este ocupado
+- Aprobacion de citas: Admin debe aprobar todas las citas antes de que se confirmen
+- Restriccion de cancelacion: no se puede cancelar menos de 1 hora antes
+- Email unico: restriccion a nivel de base de datos
+
+
+================================================================
+8. TECNOLOGIAS Y VERSIONES
+================================================================
+
+Runtime:            .NET 9
+ORM:                Entity Framework Core 9
+Driver PostgreSQL:  Npgsql.EntityFrameworkCore.PostgreSQL 9.0.4
+Auth:               Microsoft.AspNetCore.Authentication.JwtBearer 9.0.4
+JWT:                System.IdentityModel.Tokens.Jwt 8.0.1
+Passwords:          BCrypt.Net-Next 4.0.3
+Documentacion API:  Swashbuckle.AspNetCore 6.9.0 (Swagger)
+Base de datos:      PostgreSQL 18
+
+String de conexion (appsettings.json):
+  Host=localhost;Port=5432;Database=cacahuate_db;Username=postgres;Password=postgres
+
+================================================================
