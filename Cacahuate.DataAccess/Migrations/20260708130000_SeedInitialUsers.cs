@@ -19,12 +19,22 @@ public partial class SeedInitialUsers : Migration
                 ('22222222-2222-2222-2222-222222222222', 'Therapist', 'One', 'therapist1@gmail.com', '{therapistHash}', 'Therapist', true, NOW()),
                 ('33333333-3333-3333-3333-333333333333', 'Parent', 'One', 'parent1@gmail.com', '{parentHash}', 'Parent', true, NOW())
             ON CONFLICT ("Email") DO NOTHING;
+
+            INSERT INTO "Therapists" ("Id", "UserId", "Bio", "SessionDurationMinutes", "IsActive")
+            SELECT 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', NULL, 60, true
+            WHERE NOT EXISTS (SELECT 1 FROM "Therapists" WHERE "UserId" = '22222222-2222-2222-2222-222222222222');
+
+            INSERT INTO "Parents" ("Id", "UserId")
+            SELECT 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-3333-3333-3333-333333333333'
+            WHERE NOT EXISTS (SELECT 1 FROM "Parents" WHERE "UserId" = '33333333-3333-3333-3333-333333333333');
             """);
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.Sql("""
+            DELETE FROM "Therapists" WHERE "UserId" = '22222222-2222-2222-2222-222222222222';
+            DELETE FROM "Parents" WHERE "UserId" = '33333333-3333-3333-3333-333333333333';
             DELETE FROM "Users"
             WHERE "Email" IN ('admin1@gmail.com', 'therapist1@gmail.com', 'parent1@gmail.com');
             """);
