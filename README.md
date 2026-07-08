@@ -100,6 +100,14 @@ dotnet ef database update --project .\Cacahuate.DataAccess.csproj --startup-proj
 
 > Esto es importante porque `AppDbContext` se configura en `Cacahuate.API`.
 
+Si necesitas un script SQL desplegable para otro ambiente, úsalo desde la raíz del repositorio:
+
+```powershell
+dotnet ef migrations script --project Cacahuate.DataAccess --startup-project Cacahuate.API --idempotent -o create_database.sql
+```
+
+También existe un archivo manual `create_all_tables.sql` en la raíz para crear todas las tablas necesarias.
+
 ## Ejecutar la API desde Visual Studio
 
 1. Selecciona `Cacahuate.API` como proyecto de inicio.
