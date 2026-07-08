@@ -84,29 +84,56 @@ Si ya lo tienes, actualízalo para que coincida con el SDK:
 dotnet tool update --global dotnet-ef
 ```
 
-## Aplicar migraciones y crear la base de datos
+## Aplicar migraciones y crear la base de datos (pasos claros)
 
-Desde la raíz del repositorio ejecuta:
+Antes de empezar, cierra Visual Studio o detén cualquier proceso `Cacahuate.API` para evitar que las DLLs queden bloqueadas.
+
+1. (Opcional) Instala/actualiza la CLI de EF Core:
+
+```powershell
+dotnet tool install --global dotnet-ef    # si no está instalado
+dotnet tool update --global dotnet-ef     # para actualizar
+```
+
+2. Restaurar y compilar (desde la raíz del repo):
+
+```powershell
+dotnet restore Cacahuate.sln
+dotnet build Cacahuate.sln
+```
+
+3. Aplicar todas las migraciones (crea las tablas en el orden del historial):
 
 ```powershell
 dotnet ef database update --project Cacahuate.DataAccess --startup-project Cacahuate.API
 ```
 
-Si estás ubicado dentro de `Cacahuate.DataAccess`, usa este comando:
+Si estás ubicado dentro de `Cacahuate.DataAccess`, usa rutas relativas:
 
 ```powershell
 dotnet ef database update --project .\Cacahuate.DataAccess.csproj --startup-project ..\Cacahuate.API\Cacahuate.API.csproj
 ```
 
-> Esto es importante porque `AppDbContext` se configura en `Cacahuate.API`.
-
-Si necesitas un script SQL desplegable para otro ambiente, úsalo desde la raíz del repositorio:
+Notas importantes:
+- Cierra Visual Studio antes de ejecutar `dotnet build` y `dotnet ef` para evitar errores de archivos bloqueados.
+- Si necesitas un script SQL desplegable para otro ambiente (idempotente), genera el script:
 
 ```powershell
 dotnet ef migrations script --project Cacahuate.DataAccess --startup-project Cacahuate.API --idempotent -o create_database.sql
 ```
 
-También existe un archivo manual `create_all_tables.sql` en la raíz para crear todas las tablas necesarias.
+- Existe un archivo manual `create_all_tables.sql` en la raíz que crea el esquema completo. Usarlo es válido para inicializar una DB, pero no registra migraciones en `__EFMigrationsHistory`.
+- Migración añadida: la migración para crear `Notifications` se añadió como `20260708120000_AddNotificationsTable` y se aplica con los comandos anteriores. Esa migración fue hecha idempotente para evitar fallos si la tabla ya existe.
+
+Checklist rápida (copiar/pegar):
+
+```powershell
+# desde la raíz del repo
+dotnet tool update --global dotnet-ef
+dotnet restore Cacahuate.sln
+dotnet build Cacahuate.sln
+dotnet ef database update --project Cacahuate.DataAccess --startup-project Cacahuate.API
+```
 
 ## Ejecutar la API desde Visual Studio
 
@@ -134,14 +161,6 @@ La API quedará disponible en:
 - `Cacahuate.Shared`: DTOs, enums y tipos compartidos.
 
 ## Problemas comunes
-
-### `relation "FormTemplates" does not exist`
-
-Significa que no se aplicaron las migraciones. Ejecuta:
-
-```powershell
-dotnet ef database update --project Cacahuate.DataAccess --startup-project Cacahuate.API
-```
 
 ### `Unable to resolve service for type 'Microsoft.EntityFrameworkCore.DbContextOptions`1[Cacahuate.DataAccess.Context.AppDbContext]'`
 

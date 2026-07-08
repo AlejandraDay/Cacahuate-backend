@@ -7,39 +7,23 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Cacahuate.DataAccess.Migrations;
 
-[DbContext(typeof(AppDbContext))]
-[Migration("20260708120000_AddNotificationsTable")]
 public partial class AddNotificationsTable : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.CreateTable(
-            name: "Notifications",
-            columns: table => new
-            {
-                Id = table.Column<Guid>(type: "uuid", nullable: false),
-                UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                Title = table.Column<string>(type: "text", nullable: false),
-                Message = table.Column<string>(type: "text", nullable: false),
-                IsRead = table.Column<bool>(type: "boolean", nullable: false),
-                CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                AppointmentId = table.Column<Guid>(type: "uuid", nullable: true)
-            },
-            constraints: table =>
-            {
-                table.PrimaryKey("PK_Notifications", x => x.Id);
-                table.ForeignKey(
-                    name: "FK_Notifications_Users_UserId",
-                    column: x => x.UserId,
-                    principalTable: "Users",
-                    principalColumn: "Id",
-                    onDelete: ReferentialAction.Cascade);
-            });
+        // Use idempotent SQL so migration succeeds if the table already exists in the target DB
+        migrationBuilder.Sql(@"CREATE TABLE IF NOT EXISTS ""Notifications"" (
+            ""Id"" uuid NOT NULL,
+            ""UserId"" uuid NOT NULL,
+            ""Title"" text NOT NULL,
+            ""Message"" text NOT NULL,
+            ""IsRead"" boolean NOT NULL,
+            ""CreatedAt"" timestamp with time zone NOT NULL,
+            ""AppointmentId"" uuid,
+            CONSTRAINT ""PK_Notifications"" PRIMARY KEY (""Id""
+        ));");
 
-        migrationBuilder.CreateIndex(
-            name: "IX_Notifications_UserId",
-            table: "Notifications",
-            column: "UserId");
+        migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_Notifications_UserId"" ON ""Notifications"" (""UserId"");");
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
