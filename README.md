@@ -1,65 +1,58 @@
-# Cacahuate
+# Cacahuate - Backend
 
-API de Cacahuate desarrollada con ASP.NET Core y PostgreSQL.
+Este repositorio contiene el backend de la aplicación Cacahuate, una API en ASP.NET Core con PostgreSQL.
 
-## Requisitos
+## Requisitos de entorno
 
 - Windows 10/11
-- .NET SDK 9.x
+- Visual Studio 2022 o Visual Studio 2022 Community/Professional/Enterprise
+- .NET 9 SDK
 - PostgreSQL 16 (recomendado)
 - Git
-- Opcional: pgAdmin o SQL Shell (psql)
+- Opcional: pgAdmin o SQL Shell (`psql`)
 
-## 1. Instalar PostgreSQL en Windows
+## Versiones recomendadas
 
-### Opción recomendada con Winget
+- Visual Studio: 2022 (17.8 o superior)
+- SDK .NET: 9.0.x
+- PostgreSQL: 16.x
 
-Abre PowerShell y ejecuta:
+> El proyecto está configurado para `net9.0`.
+
+## Abrir el proyecto en Visual Studio
+
+1. Abre Visual Studio.
+2. Selecciona `Open a project or solution`.
+3. Navega a la carpeta del repositorio y abre `Cacahuate.sln`.
+4. Espera a que Visual Studio restaure los paquetes NuGet.
+
+## Configurar PostgreSQL
+
+### 1. Instalar PostgreSQL
+
+Puedes instalar PostgreSQL con el instalador oficial o usando Winget:
 
 ```powershell
 winget install PostgreSQL.PostgreSQL.16
 ```
 
-Durante la instalación, define una contraseña para el usuario `postgres`.
-Si prefieres, puedes usar la contraseña `postgres` para que coincida con la configuración por defecto del proyecto.
+### 2. Crear la base de datos
 
-### Verificar la instalación
-
-Puedes abrir `pgAdmin` o el comando `psql` desde SQL Shell.
-
-## 2. Crear la base de datos
-
-Abre `psql` o `pgAdmin` y ejecuta lo siguiente:
+Abre `psql` o `pgAdmin` y ejecuta:
 
 ```sql
 CREATE DATABASE cacahuate_db;
 ```
 
-Si quieres asegurar que el usuario `postgres` tenga la contraseña `postgres`, ejecuta:
+Si quieres usar la contraseña por defecto del proyecto, configura el usuario `postgres` así:
 
 ```sql
 ALTER USER postgres WITH PASSWORD 'postgres';
 ```
 
-> Si usas otra contraseña, tendrás que actualizar la cadena de conexión en el proyecto.
+### 3. Verificar la cadena de conexión
 
-## 3. Credenciales que usa este proyecto
-
-El proyecto está configurado por defecto para usar estas credenciales:
-
-- Host: `localhost`
-- Puerto: `5432`
-- Base de datos: `cacahuate_db`
-- Usuario: `postgres`
-- Contraseña: `postgres`
-
-La cadena de conexión está en:
-
-```json
-Cacahuate.API/appsettings.json
-```
-
-Si cambiaste la contraseña de PostgreSQL, actualiza esta parte:
+El proyecto usa esta cadena de conexión en `Cacahuate.API/appsettings.json`:
 
 ```json
 "ConnectionStrings": {
@@ -67,29 +60,53 @@ Si cambiaste la contraseña de PostgreSQL, actualiza esta parte:
 }
 ```
 
-## 4. Restaurar dependencias
+Si cambiaste usuario, contraseña, nombre de base de datos o puerto, actualiza esta línea.
 
-Desde la raíz del proyecto ejecuta:
+## Restaurar dependencias
+
+Desde Visual Studio normalmente se restauran automáticamente. Si necesitas hacerlo manualmente, abre una terminal en la raíz y ejecuta:
 
 ```powershell
 dotnet restore Cacahuate.sln
 ```
 
-## 5. Instalar la herramienta de Entity Framework (si no está instalada)
+## Instalar / actualizar Entity Framework CLI
+
+Si no tienes `dotnet-ef`, instálalo:
 
 ```powershell
 dotnet tool install --global dotnet-ef
 ```
 
-## 6. Crear o actualizar la base de datos
+Si ya lo tienes, actualízalo para que coincida con el SDK:
+
+```powershell
+dotnet tool update --global dotnet-ef
+```
+
+## Aplicar migraciones y crear la base de datos
+
+Desde la raíz del repositorio ejecuta:
 
 ```powershell
 dotnet ef database update --project Cacahuate.DataAccess --startup-project Cacahuate.API
 ```
 
-Si aparece un error de que `dotnet-ef` no se encuentra, reinicia la terminal o verifica que el PATH incluya la ruta de instalación de dotnet tools.
+Si estás ubicado dentro de `Cacahuate.DataAccess`, usa este comando:
 
-## 7. Ejecutar la API
+```powershell
+dotnet ef database update --project .\Cacahuate.DataAccess.csproj --startup-project ..\Cacahuate.API\Cacahuate.API.csproj
+```
+
+> Esto es importante porque `AppDbContext` se configura en `Cacahuate.API`.
+
+## Ejecutar la API desde Visual Studio
+
+1. Selecciona `Cacahuate.API` como proyecto de inicio.
+2. Asegúrate de que el perfil de ejecución use `https` o `http` según prefieras.
+3. Presiona `F5` o `Ctrl+F5`.
+
+## Ejecutar la API desde terminal
 
 ```powershell
 dotnet run --project .\Cacahuate.API\Cacahuate.API.csproj
@@ -101,42 +118,34 @@ La API quedará disponible en:
 - HTTPS: `https://localhost:7191`
 - Swagger: `http://localhost:5004/swagger` o `https://localhost:7191/swagger`
 
-## 8. Notas importantes
+## Estructura relevante del backend
 
-- Al iniciar la API, se ejecuta un seeding inicial de plantillas de formularios.
-- Si la base de datos no existe, debes crearla antes de correr la aplicación.
-- Si el puerto 5432 está ocupado o PostgreSQL está instalado en otro puerto, ajusta la cadena de conexión.
+- `Cacahuate.API`: proyecto web ASP.NET Core.
+- `Cacahuate.DataAccess`: proyecto de Entity Framework Core, contexto y migraciones.
+- `Cacahuate.Services`: lógica de negocio e implementación de servicios.
+- `Cacahuate.Shared`: DTOs, enums y tipos compartidos.
 
-## 9. Solución rápida si algo falla
+## Problemas comunes
 
-### Error de conexión a PostgreSQL
+### `relation "FormTemplates" does not exist`
 
-Verifica que:
-
-- PostgreSQL esté corriendo como servicio.
-- La contraseña en la cadena de conexión coincida con la de PostgreSQL.
-- La base de datos `cacahuate_db` exista.
-
-### Error: `relation "FormTemplates" does not exist`
-
-Este error significa que las migraciones no se aplicaron y la tabla de formularios aún no fue creada.
-
-Ejecuta:
+Significa que no se aplicaron las migraciones. Ejecuta:
 
 ```powershell
 dotnet ef database update --project Cacahuate.DataAccess --startup-project Cacahuate.API
 ```
 
-Si la base de datos no existe, créala primero:
+### `Unable to resolve service for type 'Microsoft.EntityFrameworkCore.DbContextOptions`1[Cacahuate.DataAccess.Context.AppDbContext]'`
 
-```sql
-CREATE DATABASE cacahuate_db;
-```
+Ejecuta el comando de migraciones con el `--startup-project` correcto. El proyecto de inicio debe ser `Cacahuate.API`.
 
-### Error de `dotnet ef`
+### `dotnet ef` no encontrado
 
-Ejecuta:
+Reinicia la terminal después de instalar o actualizar `dotnet-ef`, y verifica que la carpeta de herramientas globales esté en tu `PATH`.
 
-```powershell
-dotnet tool update --global dotnet-ef
-```
+## Últimos consejos
+
+- Usa Visual Studio 2022 para mejor compatibilidad con .NET 9.
+- Si usas otra versión de PostgreSQL, ajusta la cadena de conexión.
+- Si el puerto 5432 está ocupado, cambia el puerto en PostgreSQL y en `appsettings.json`.
+- Si trabajas en otro ambiente, revisa que `appsettings.Development.json` no sobrescriba la conexión.
