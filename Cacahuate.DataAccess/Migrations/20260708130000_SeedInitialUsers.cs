@@ -21,12 +21,16 @@ public partial class SeedInitialUsers : Migration
             ON CONFLICT ("Email") DO NOTHING;
 
             INSERT INTO "Therapists" ("Id", "UserId", "Bio", "SessionDurationMinutes", "IsActive")
-            SELECT 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', NULL, 60, true
-            WHERE NOT EXISTS (SELECT 1 FROM "Therapists" WHERE "UserId" = '22222222-2222-2222-2222-222222222222');
+            SELECT 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', u."Id", NULL, 60, true
+            FROM "Users" u
+            WHERE u."Email" = 'therapist1@gmail.com'
+              AND NOT EXISTS (SELECT 1 FROM "Therapists" t WHERE t."UserId" = u."Id");
 
             INSERT INTO "Parents" ("Id", "UserId")
-            SELECT 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-3333-3333-3333-333333333333'
-            WHERE NOT EXISTS (SELECT 1 FROM "Parents" WHERE "UserId" = '33333333-3333-3333-3333-333333333333');
+            SELECT 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', u."Id"
+            FROM "Users" u
+            WHERE u."Email" = 'parent1@gmail.com'
+              AND NOT EXISTS (SELECT 1 FROM "Parents" p WHERE p."UserId" = u."Id");
             """);
     }
 
