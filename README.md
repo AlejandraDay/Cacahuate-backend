@@ -117,6 +117,22 @@ Verifica que:
 - La contraseña en la cadena de conexión coincida con la de PostgreSQL.
 - La base de datos `cacahuate_db` exista.
 
+### Error: `relation "FormTemplates" does not exist`
+
+Este error significa que las migraciones no se aplicaron y la tabla de formularios aún no fue creada.
+
+Ejecuta:
+
+```powershell
+dotnet ef database update --project Cacahuate.DataAccess --startup-project Cacahuate.API
+```
+
+Si la base de datos no existe, créala primero:
+
+```sql
+CREATE DATABASE cacahuate_db;
+```
+
 ### Error de `dotnet ef`
 
 Ejecuta:
