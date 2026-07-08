@@ -101,6 +101,14 @@ public class FormService(
         };
     }
 
+    public async Task<FormSubmissionResponse> GetSubmissionByIdAsync(Guid submissionId)
+    {
+        var submission = await formRepository.GetSubmissionByIdAsync(submissionId)
+            ?? throw new KeyNotFoundException("Submission not found.");
+
+        return MapSubmission(submission, submission.FormAssignment.FormTemplate.Fields);
+    }
+
     public async Task<AppointmentFormResponse> SubmitFormAsync(
         Guid appointmentId, Guid assignmentId, SubmitFormRequest request, Guid therapistUserId)
     {

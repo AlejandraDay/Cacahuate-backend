@@ -763,6 +763,8 @@ public class SchedulingService(
         EnRouteAt = a.EnRouteAt,
         InProgressAt = a.InProgressAt,
         IsRated = a.Rating != null,
+        RatingStars = a.Rating?.Stars,
+        FormSubmissionId = a.FormSubmission?.Id,
         CreatedAt = a.CreatedAt
     };
 

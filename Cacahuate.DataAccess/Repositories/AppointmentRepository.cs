@@ -13,6 +13,7 @@ public class AppointmentRepository(AppDbContext db) : IAppointmentRepository
             .Include(a => a.Patient)
             .Include(a => a.Parent).ThenInclude(p => p.User)
             .Include(a => a.Rating)
+            .Include(a => a.FormSubmission)
             .FirstOrDefaultAsync(a => a.Id == id);
 
     public Task<List<Appointment>> GetByPatientAsync(Guid patientId) =>
@@ -20,6 +21,7 @@ public class AppointmentRepository(AppDbContext db) : IAppointmentRepository
             .Include(a => a.Therapist).ThenInclude(t => t.User)
             .Include(a => a.Patient)
             .Include(a => a.Rating)
+            .Include(a => a.FormSubmission)
             .Where(a => a.PatientId == patientId)
             .OrderByDescending(a => a.Date).ThenBy(a => a.StartTime)
             .ToListAsync();
@@ -29,6 +31,7 @@ public class AppointmentRepository(AppDbContext db) : IAppointmentRepository
             .Include(a => a.Patient)
             .Include(a => a.Parent).ThenInclude(p => p.User)
             .Include(a => a.Rating)
+            .Include(a => a.FormSubmission)
             .Where(a => a.TherapistId == therapistId)
             .OrderByDescending(a => a.Date).ThenBy(a => a.StartTime)
             .ToListAsync();
@@ -38,6 +41,7 @@ public class AppointmentRepository(AppDbContext db) : IAppointmentRepository
             .Include(a => a.Therapist).ThenInclude(t => t.User)
             .Include(a => a.Patient)
             .Include(a => a.Rating)
+            .Include(a => a.FormSubmission)
             .Where(a => a.ParentId == parentId)
             .OrderByDescending(a => a.Date).ThenBy(a => a.StartTime)
             .ToListAsync();
@@ -48,6 +52,7 @@ public class AppointmentRepository(AppDbContext db) : IAppointmentRepository
             .Include(a => a.Patient)
             .Include(a => a.Parent).ThenInclude(p => p.User)
             .Include(a => a.Rating)
+            .Include(a => a.FormSubmission)
             .OrderByDescending(a => a.Date).ThenBy(a => a.StartTime)
             .ToListAsync();
 

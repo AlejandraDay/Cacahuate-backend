@@ -73,5 +73,15 @@ public class FormRepository(AppDbContext db) : IFormRepository
                 .ThenInclude(t => t.Fields.OrderBy(f => f.Order))
             .FirstOrDefaultAsync(s => s.AppointmentId == appointmentId);
 
+    public Task<FormSubmission?> GetSubmissionByIdAsync(Guid submissionId) =>
+        db.FormSubmissions
+            .Include(s => s.Answers)
+            .Include(s => s.Therapist).ThenInclude(t => t.User)
+            .Include(s => s.FormAssignment).ThenInclude(a => a.FormTemplate)
+                .ThenInclude(t => t.Fields.OrderBy(f => f.Order))
+            .Include(s => s.Appointment).ThenInclude(a => a.Therapist).ThenInclude(t => t.User)
+            .Include(s => s.Appointment).ThenInclude(a => a.Parent).ThenInclude(p => p.User)
+            .FirstOrDefaultAsync(s => s.Id == submissionId);
+
     public Task SaveChangesAsync() => db.SaveChangesAsync();
 }

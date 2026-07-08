@@ -28,5 +28,7 @@ public class AppointmentResponse
     public DateTime? EnRouteAt { get; set; }
     public DateTime? InProgressAt { get; set; }
     public bool IsRated { get; set; }
+    public int? RatingStars { get; set; }
+    public Guid? FormSubmissionId { get; set; }
     public DateTime CreatedAt { get; set; }
 }

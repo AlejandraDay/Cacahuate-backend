@@ -147,8 +147,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .HasForeignKey(s => s.FormAssignmentId)
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasOne(s => s.Appointment)
-                .WithMany()
-                .HasForeignKey(s => s.AppointmentId)
+                .WithOne(a => a.FormSubmission)
+                .HasForeignKey<FormSubmission>(s => s.AppointmentId)
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasOne(s => s.Therapist)
                 .WithMany()

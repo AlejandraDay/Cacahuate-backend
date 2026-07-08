@@ -19,6 +19,7 @@ public interface IFormRepository
     // Submissions
     Task AddSubmissionAsync(FormSubmission submission);
     Task<FormSubmission?> GetSubmissionByAppointmentIdAsync(Guid appointmentId);
+    Task<FormSubmission?> GetSubmissionByIdAsync(Guid submissionId);
 
     Task SaveChangesAsync();
 }

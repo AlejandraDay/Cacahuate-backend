@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Cacahuate.DataAccess.Repositories;
 using Cacahuate.Services.Interfaces;
 using Cacahuate.Shared.DTOs.Forms;
 using Microsoft.AspNetCore.Authorization;
@@ -9,7 +10,7 @@ namespace Cacahuate.API.Controllers;
 [ApiController]
 [Route("api/forms")]
 [Authorize]
-public class FormsController(IFormService formService) : ControllerBase
+public class FormsController(IFormService formService, IFormRepository formRepository, IAppointmentRepository appointmentRepository) : ControllerBase
 {
     private Guid CurrentUserId =>
         Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -63,11 +64,49 @@ public class FormsController(IFormService formService) : ControllerBase
     // ── Per-appointment form (Therapist) ───────────────────────────────────────
 
     [HttpGet("for-appointment/{appointmentId}")]
-    [Authorize(Roles = "Therapist")]
+    [Authorize(Roles = "Admin,Therapist,Parent")]
     public async Task<ActionResult<AppointmentFormResponse>> GetFormForAppointment(Guid appointmentId)
     {
+        var appointment = await appointmentRepository.GetByIdAsync(appointmentId)
+            ?? throw new KeyNotFoundException("Appointment not found.");
+
+        if (User.IsInRole("Parent") && appointment.Parent.UserId != CurrentUserId)
+            throw new UnauthorizedAccessException("No autorizado para ver este informe.");
+
+        if (User.IsInRole("Therapist") && appointment.Therapist.UserId != CurrentUserId)
+            throw new UnauthorizedAccessException("No autorizado para ver este informe.");
+
         var result = await formService.GetFormForAppointmentAsync(appointmentId);
         return Ok(result);
+    }
+
+    [HttpGet("submissions/{submissionId}")]
+    [Authorize(Roles = "Admin,Therapist,Parent")]
+    public async Task<ActionResult<FormSubmissionResponse>> GetSubmission(Guid submissionId)
+    {
+        var submission = await formRepository.GetSubmissionByIdAsync(submissionId)
+            ?? throw new KeyNotFoundException("Submission not found.");
+
+        if (User.IsInRole("Parent") && submission.Appointment.Parent.UserId != CurrentUserId)
+            throw new UnauthorizedAccessException("No autorizado para ver este informe.");
+
+        if (User.IsInRole("Therapist") && submission.Appointment.Therapist.UserId != CurrentUserId)
+            throw new UnauthorizedAccessException("No autorizado para ver este informe.");
+
+        return Ok(new FormSubmissionResponse
+        {
+            Id = submission.Id,
+            AppointmentId = submission.AppointmentId,
+            TherapistName = submission.Therapist.User != null ? $"{submission.Therapist.User.FirstName} {submission.Therapist.User.LastName}" : string.Empty,
+            SubmittedAt = submission.SubmittedAt,
+            Answers = submission.Answers.Select(ans => new FormAnswerResponse
+            {
+                FieldId = ans.FormFieldId,
+                FieldLabel = submission.FormAssignment.FormTemplate.Fields.FirstOrDefault(f => f.Id == ans.FormFieldId)?.Label ?? string.Empty,
+                FieldType = submission.FormAssignment.FormTemplate.Fields.FirstOrDefault(f => f.Id == ans.FormFieldId)?.Type ?? default,
+                Value = ans.Value
+            }).ToList()
+        });
     }
 
     [HttpPost("for-appointment/{appointmentId}/submit/{assignmentId}")]
