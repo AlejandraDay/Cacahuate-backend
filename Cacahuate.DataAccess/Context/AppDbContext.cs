@@ -18,6 +18,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<FormAssignment> FormAssignments => Set<FormAssignment>();
     public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
     public DbSet<FormAnswer> FormAnswers => Set<FormAnswer>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -26,6 +27,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasKey(u => u.Id);
             e.HasIndex(u => u.Email).IsUnique();
             e.Property(u => u.Role).HasConversion<string>();
+        });
+
+        modelBuilder.Entity<RefreshToken>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.HasIndex(r => r.Token).IsUnique();
+            e.HasOne(r => r.User)
+                .WithMany(u => u.RefreshTokens)
+                .HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Therapist>(e =>

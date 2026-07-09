@@ -16,4 +16,5 @@ public class User
     public Therapist? Therapist { get; set; }
     public Parent? Parent { get; set; }
     public ICollection<Notification> Notifications { get; set; } = [];
+    public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
 }

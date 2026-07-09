@@ -35,4 +35,25 @@ public class AuthController(IAuthService authService) : ControllerBase
             return Unauthorized(new { message = ex.Message });
         }
     }
+
+    [HttpPost("refresh")]
+    public async Task<ActionResult<LoginResponse>> Refresh([FromBody] RefreshTokenRequest request)
+    {
+        try
+        {
+            var response = await authService.RefreshAsync(request);
+            return Ok(response);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout([FromBody] RefreshTokenRequest request)
+    {
+        await authService.RevokeAsync(request.RefreshToken);
+        return NoContent();
+    }
 }
