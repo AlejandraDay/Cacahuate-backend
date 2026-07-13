@@ -188,6 +188,54 @@ public class SchedulingService(
         return appointments.Select(MapToAppointmentResponse).ToList();
     }
 
+    public async Task<AppointmentResponse> SignAppointmentAsync(Guid appointmentId, Guid userId, string role, SignAppointmentRequest request)
+    {
+        var appointment = await appointmentRepository.GetByIdAsync(appointmentId)
+            ?? throw new KeyNotFoundException("Appointment not found.");
+
+        if (appointment.Status != AppointmentStatus.Completed)
+            throw new InvalidOperationException("Only completed appointments can be signed.");
+
+        string fullName;
+        if (role == "Parent")
+        {
+            if (appointment.ParentSignature != null)
+                throw new InvalidOperationException("This appointment has already been signed by the parent.");
+
+            var parent = await parentRepository.GetByUserIdAsync(userId)
+                ?? throw new KeyNotFoundException("Parent not found.");
+            fullName = $"{parent.User.FirstName} {parent.User.LastName}";
+
+            if (!string.Equals(request.Signature.Trim(), fullName, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Signature does not match your registered name.");
+
+            appointment.ParentSignature = request.Signature.Trim();
+            appointment.ParentSignedAt = DateTime.UtcNow;
+        }
+        else if (role == "Therapist")
+        {
+            if (appointment.TherapistSignature != null)
+                throw new InvalidOperationException("This appointment has already been signed by the therapist.");
+
+            var therapist = await therapistRepository.GetByUserIdAsync(userId)
+                ?? throw new KeyNotFoundException("Therapist not found.");
+            fullName = $"{therapist.User.FirstName} {therapist.User.LastName}";
+
+            if (!string.Equals(request.Signature.Trim(), fullName, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Signature does not match your registered name.");
+
+            appointment.TherapistSignature = request.Signature.Trim();
+            appointment.TherapistSignedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            throw new UnauthorizedAccessException("Only parents and therapists can sign appointments.");
+        }
+
+        await appointmentRepository.SaveChangesAsync();
+        return MapToAppointmentResponse(appointment);
+    }
+
     public async Task<List<AppointmentResponse>> GetAppointmentsByTherapistAsync(Guid therapistUserId)
     {
         var therapist = await therapistRepository.GetByUserIdAsync(therapistUserId)
@@ -762,6 +810,10 @@ public class SchedulingService(
         ProgressUpdatedAt = a.ProgressUpdatedAt,
         EnRouteAt = a.EnRouteAt,
         InProgressAt = a.InProgressAt,
+        ParentSignature = a.ParentSignature,
+        ParentSignedAt = a.ParentSignedAt,
+        TherapistSignature = a.TherapistSignature,
+        TherapistSignedAt = a.TherapistSignedAt,
         IsRated = a.Rating != null,
         RatingStars = a.Rating?.Stars,
         FormSubmissionId = a.FormSubmission?.Id,

@@ -210,4 +210,14 @@ public class SchedulingController(ISchedulingService schedulingService) : Contro
         var result = await schedulingService.GetMyRatingsAsync(CurrentUserId);
         return Ok(result);
     }
+
+    // Parent or Therapist: sign a completed appointment
+    [HttpPost("appointments/{appointmentId}/sign")]
+    [Authorize(Roles = "Parent,Therapist")]
+    public async Task<ActionResult<AppointmentResponse>> SignAppointment(Guid appointmentId, [FromBody] SignAppointmentRequest request)
+    {
+        var role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+        var result = await schedulingService.SignAppointmentAsync(appointmentId, CurrentUserId, role, request);
+        return Ok(result);
+    }
 }

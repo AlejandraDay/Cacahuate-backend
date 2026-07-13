@@ -26,4 +26,5 @@ public interface ISchedulingService
     Task<RatingResponse> RateTherapistAsync(Guid appointmentId, Guid parentUserId, RatingRequest request);
     Task<List<RatingResponse>> GetTherapistRatingsAsync(Guid therapistId);
     Task<List<RatingResponse>> GetMyRatingsAsync(Guid therapistUserId);
+    Task<AppointmentResponse> SignAppointmentAsync(Guid appointmentId, Guid userId, string role, SignAppointmentRequest request);
 }

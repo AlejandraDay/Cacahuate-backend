@@ -27,6 +27,10 @@ public class Appointment
     public DateTime? ProgressUpdatedAt { get; set; }
     public DateTime? EnRouteAt { get; set; }
     public DateTime? InProgressAt { get; set; }
+    public string? ParentSignature { get; set; }
+    public DateTime? ParentSignedAt { get; set; }
+    public string? TherapistSignature { get; set; }
+    public DateTime? TherapistSignedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public Therapist Therapist { get; set; } = null!;

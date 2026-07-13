@@ -27,6 +27,10 @@ public class AppointmentResponse
     public DateTime? ProgressUpdatedAt { get; set; }
     public DateTime? EnRouteAt { get; set; }
     public DateTime? InProgressAt { get; set; }
+    public string? ParentSignature { get; set; }
+    public DateTime? ParentSignedAt { get; set; }
+    public string? TherapistSignature { get; set; }
+    public DateTime? TherapistSignedAt { get; set; }
     public bool IsRated { get; set; }
     public int? RatingStars { get; set; }
     public Guid? FormSubmissionId { get; set; }
