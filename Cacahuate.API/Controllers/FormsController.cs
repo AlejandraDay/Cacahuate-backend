@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Cacahuate.DataAccess.Repositories;
 using Cacahuate.Services.Interfaces;
+using Cacahuate.Shared.DTOs.Common;
 using Cacahuate.Shared.DTOs.Forms;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -55,17 +56,28 @@ public class FormsController(IFormService formService, IFormRepository formRepos
 
     [HttpGet("assignments")]
     [Authorize(Roles = "Admin")]
-    public async Task<ActionResult<List<FormAssignmentResponse>>> GetAllAssignments()
+    public async Task<ActionResult<PagedResult<FormAssignmentResponse>>> GetAllAssignments(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] Guid? patientId = null)
     {
-        var result = await formService.GetAllAssignmentsAsync();
+        var result = await formService.GetAllAssignmentsPagedAsync(page, pageSize, patientId);
         return Ok(result);
     }
 
-    // ── Per-appointment form (Therapist) ───────────────────────────────────────
+    // ── Assignments (Therapist) ────────────────────────────────────────────────
+
+    [HttpGet("assignments/my")]
+    [Authorize(Roles = "Therapist")]
+    public async Task<ActionResult<List<FormAssignmentResponse>>> GetMyAssignments()
+    {
+        var result = await formService.GetAssignmentsForTherapistAsync(CurrentUserId);
+        return Ok(result);
+    }
+
+    // ── Per-appointment forms (Therapist) ───────────────────────────────────────
 
     [HttpGet("for-appointment/{appointmentId}")]
     [Authorize(Roles = "Admin,Therapist,Parent")]
-    public async Task<ActionResult<AppointmentFormResponse>> GetFormForAppointment(Guid appointmentId)
+    public async Task<ActionResult<List<AppointmentFormResponse>>> GetFormForAppointment(Guid appointmentId)
     {
         var appointment = await appointmentRepository.GetByIdAsync(appointmentId)
             ?? throw new KeyNotFoundException("Appointment not found.");
@@ -76,7 +88,7 @@ public class FormsController(IFormService formService, IFormRepository formRepos
         if (User.IsInRole("Therapist") && appointment.Therapist.UserId != CurrentUserId)
             throw new UnauthorizedAccessException("No autorizado para ver este informe.");
 
-        var result = await formService.GetFormForAppointmentAsync(appointmentId);
+        var result = await formService.GetFormsForAppointmentAsync(appointmentId);
         return Ok(result);
     }
 

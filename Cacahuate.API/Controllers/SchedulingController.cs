@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Cacahuate.Services.Interfaces;
+using Cacahuate.Shared.DTOs.Common;
 using Cacahuate.Shared.DTOs.Scheduling;
+using Cacahuate.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -131,12 +133,31 @@ public class SchedulingController(ISchedulingService schedulingService) : Contro
         return Ok(result);
     }
 
-    // Admin: list all patients
+    // Admin: list all patients (paginated)
     [HttpGet("patients/all")]
     [Authorize(Roles = "Admin")]
-    public async Task<ActionResult<List<PatientResponse>>> GetAllPatients()
+    public async Task<ActionResult<PagedResult<PatientResponse>>> GetAllPatients(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? search = null)
+    {
+        var result = await schedulingService.GetAllPatientsPagedAsync(page, pageSize, search);
+        return Ok(result);
+    }
+
+    // Admin: full unpaginated patient list, for dropdowns/selectors
+    [HttpGet("patients/lookup")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<List<PatientResponse>>> GetPatientsLookup()
     {
         var result = await schedulingService.GetAllPatientsAsync();
+        return Ok(result);
+    }
+
+    // Admin: single patient by id
+    [HttpGet("patients/{patientId}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<PatientResponse>> GetPatientById(Guid patientId)
+    {
+        var result = await schedulingService.GetPatientByIdAsync(patientId);
         return Ok(result);
     }
 
@@ -167,12 +188,35 @@ public class SchedulingController(ISchedulingService schedulingService) : Contro
         return Ok(result);
     }
 
-    // Admin: get all appointments
+    // Admin: get all appointments (paginated + filterable)
     [HttpGet("appointments/admin/all")]
     [Authorize(Roles = "Admin")]
-    public async Task<ActionResult<List<AppointmentResponse>>> GetAllAppointments()
+    public async Task<ActionResult<PagedResult<AppointmentResponse>>> GetAllAppointments(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
+        [FromQuery] Guid? patientId = null, [FromQuery] Guid? therapistId = null,
+        [FromQuery] AppointmentStatus? status = null,
+        [FromQuery] DateOnly? dateFrom = null, [FromQuery] DateOnly? dateTo = null)
     {
-        var result = await schedulingService.GetAllAppointmentsAsync();
+        var result = await schedulingService.GetAllAppointmentsPagedAsync(
+            page, pageSize, patientId, therapistId, status, dateFrom, dateTo);
+        return Ok(result);
+    }
+
+    // Admin: distinct therapists a given patient has had appointments with (for filter dropdowns)
+    [HttpGet("appointments/patient/{patientId}/therapists")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<List<NameLookupResponse>>> GetTherapistsForPatient(Guid patientId)
+    {
+        var result = await schedulingService.GetDistinctTherapistsForPatientAsync(patientId);
+        return Ok(result);
+    }
+
+    // Admin: distinct patients a given therapist has treated (for filter dropdowns)
+    [HttpGet("appointments/therapist/{therapistId}/patients")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<List<NameLookupResponse>>> GetPatientsForTherapist(Guid therapistId)
+    {
+        var result = await schedulingService.GetDistinctPatientsForTherapistAsync(therapistId);
         return Ok(result);
     }
 

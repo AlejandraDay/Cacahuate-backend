@@ -33,6 +33,6 @@ public class AppointmentResponse
     public DateTime? TherapistSignedAt { get; set; }
     public bool IsRated { get; set; }
     public int? RatingStars { get; set; }
-    public Guid? FormSubmissionId { get; set; }
+    public List<Guid> FormSubmissionIds { get; set; } = [];
     public DateTime CreatedAt { get; set; }
 }

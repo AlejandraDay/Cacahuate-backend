@@ -21,6 +21,27 @@ public class PatientRepository(AppDbContext db) : IPatientRepository
             .OrderBy(p => p.FirstName).ThenBy(p => p.LastName)
             .ToListAsync();
 
+    public async Task<(List<Patient> Items, int TotalCount)> GetAllPagedAsync(int page, int pageSize, string? search)
+    {
+        var query = db.Patients.Include(p => p.Parent).ThenInclude(par => par.User)
+            .Where(p => p.IsActive);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(p => p.FirstName.ToLower().Contains(term) || p.LastName.ToLower().Contains(term));
+        }
+
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderBy(p => p.FirstName).ThenBy(p => p.LastName)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, totalCount);
+    }
+
     public async Task AddAsync(Patient patient) => await db.Patients.AddAsync(patient);
 
     public Task SaveChangesAsync() => db.SaveChangesAsync();

@@ -1,4 +1,6 @@
+using Cacahuate.Shared.DTOs.Common;
 using Cacahuate.Shared.DTOs.Scheduling;
+using Cacahuate.Shared.Enums;
 
 namespace Cacahuate.Services.Interfaces;
 
@@ -19,9 +21,16 @@ public interface ISchedulingService
     Task<AppointmentResponse> MarkInProgressAsync(Guid appointmentId, Guid therapistUserId);
     Task<List<AppointmentResponse>> GetPendingAppointmentsAsync();
     Task<List<AppointmentResponse>> GetAllAppointmentsAsync();
+    Task<PagedResult<AppointmentResponse>> GetAllAppointmentsPagedAsync(
+        int page, int pageSize, Guid? patientId, Guid? therapistId,
+        AppointmentStatus? status, DateOnly? dateFrom, DateOnly? dateTo);
+    Task<List<NameLookupResponse>> GetDistinctTherapistsForPatientAsync(Guid patientId);
+    Task<List<NameLookupResponse>> GetDistinctPatientsForTherapistAsync(Guid therapistId);
     Task<PatientResponse> AddPatientAsync(Guid parentUserId, PatientRequest request);
     Task<List<PatientResponse>> GetPatientsByParentAsync(Guid parentUserId);
     Task<List<PatientResponse>> GetAllPatientsAsync();
+    Task<PagedResult<PatientResponse>> GetAllPatientsPagedAsync(int page, int pageSize, string? search);
+    Task<PatientResponse> GetPatientByIdAsync(Guid patientId);
     Task<AppointmentResponse> AddProgressNotesAsync(Guid appointmentId, Guid therapistUserId, ProgressRequest request);
     Task<RatingResponse> RateTherapistAsync(Guid appointmentId, Guid parentUserId, RatingRequest request);
     Task<List<RatingResponse>> GetTherapistRatingsAsync(Guid therapistId);

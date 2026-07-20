@@ -14,11 +14,14 @@ public interface IFormRepository
     Task AddAssignmentAsync(FormAssignment assignment);
     Task<FormAssignment?> GetAssignmentByIdAsync(Guid id);
     Task<List<FormAssignment>> GetAllAssignmentsAsync();
-    Task<FormAssignment?> GetActiveAssignmentByPatientIdAsync(Guid patientId);
+    Task<(List<FormAssignment> Items, int TotalCount)> GetAllAssignmentsPagedAsync(int page, int pageSize, Guid? patientId);
+    Task<List<FormAssignment>> GetAssignmentsByPatientIdAsync(Guid patientId);
+    Task<List<FormAssignment>> GetAssignmentsByPatientIdsAsync(IEnumerable<Guid> patientIds);
+    Task<bool> AssignmentExistsAsync(Guid patientId, Guid formTemplateId);
 
     // Submissions
     Task AddSubmissionAsync(FormSubmission submission);
-    Task<FormSubmission?> GetSubmissionByAppointmentIdAsync(Guid appointmentId);
+    Task<FormSubmission?> GetSubmissionByAppointmentAndAssignmentAsync(Guid appointmentId, Guid assignmentId);
     Task<FormSubmission?> GetSubmissionByIdAsync(Guid submissionId);
 
     Task SaveChangesAsync();

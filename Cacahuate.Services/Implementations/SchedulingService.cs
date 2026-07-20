@@ -1,6 +1,7 @@
 ﻿using Cacahuate.DataAccess.Entities;
 using Cacahuate.DataAccess.Repositories;
 using Cacahuate.Services.Interfaces;
+using Cacahuate.Shared.DTOs.Common;
 using Cacahuate.Shared.DTOs.Scheduling;
 using Cacahuate.Shared.Enums;
 
@@ -490,16 +491,37 @@ public class SchedulingService(
     public async Task<List<PatientResponse>> GetAllPatientsAsync()
     {
         var patients = await patientRepository.GetAllAsync();
-        return patients.Select(p => new PatientResponse
-        {
-            Id = p.Id,
-            FirstName = p.FirstName,
-            LastName = p.LastName,
-            DateOfBirth = p.DateOfBirth,
-            Notes = p.Notes,
-            ParentName = p.Parent?.User != null ? $"{p.Parent.User.FirstName} {p.Parent.User.LastName}" : ""
-        }).ToList();
+        return patients.Select(MapToPatientResponse).ToList();
     }
+
+    public async Task<PagedResult<PatientResponse>> GetAllPatientsPagedAsync(int page, int pageSize, string? search)
+    {
+        var (items, totalCount) = await patientRepository.GetAllPagedAsync(page, pageSize, search);
+        return new PagedResult<PatientResponse>
+        {
+            Items = items.Select(MapToPatientResponse).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
+    public async Task<PatientResponse> GetPatientByIdAsync(Guid patientId)
+    {
+        var patient = await patientRepository.GetByIdAsync(patientId)
+            ?? throw new KeyNotFoundException("Patient not found.");
+        return MapToPatientResponse(patient);
+    }
+
+    private static PatientResponse MapToPatientResponse(Patient p) => new()
+    {
+        Id = p.Id,
+        FirstName = p.FirstName,
+        LastName = p.LastName,
+        DateOfBirth = p.DateOfBirth,
+        Notes = p.Notes,
+        ParentName = p.Parent?.User != null ? $"{p.Parent.User.FirstName} {p.Parent.User.LastName}" : ""
+    };
 
     // â"€â"€ Progress & Ratings â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
@@ -744,6 +766,34 @@ public class SchedulingService(
         return appointments.Select(MapToAppointmentResponse).ToList();
     }
 
+    public async Task<PagedResult<AppointmentResponse>> GetAllAppointmentsPagedAsync(
+        int page, int pageSize, Guid? patientId, Guid? therapistId,
+        AppointmentStatus? status, DateOnly? dateFrom, DateOnly? dateTo)
+    {
+        var (items, totalCount) = await appointmentRepository.GetAllPagedAsync(
+            page, pageSize, patientId, therapistId, status, dateFrom, dateTo);
+
+        return new PagedResult<AppointmentResponse>
+        {
+            Items = items.Select(MapToAppointmentResponse).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
+    public async Task<List<NameLookupResponse>> GetDistinctTherapistsForPatientAsync(Guid patientId)
+    {
+        var results = await appointmentRepository.GetDistinctTherapistsForPatientAsync(patientId);
+        return results.Select(r => new NameLookupResponse { Id = r.Id, Name = r.Name }).ToList();
+    }
+
+    public async Task<List<NameLookupResponse>> GetDistinctPatientsForTherapistAsync(Guid therapistId)
+    {
+        var results = await appointmentRepository.GetDistinctPatientsForTherapistAsync(therapistId);
+        return results.Select(r => new NameLookupResponse { Id = r.Id, Name = r.Name }).ToList();
+    }
+
     // â"€â"€ Helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
     private static List<TimeSlotResponse> BuildTimeSlots(TherapistAvailability availability)
@@ -816,7 +866,7 @@ public class SchedulingService(
         TherapistSignedAt = a.TherapistSignedAt,
         IsRated = a.Rating != null,
         RatingStars = a.Rating?.Stars,
-        FormSubmissionId = a.FormSubmission?.Id,
+        FormSubmissionIds = a.FormSubmissions.Select(s => s.Id).ToList(),
         CreatedAt = a.CreatedAt
     };
 

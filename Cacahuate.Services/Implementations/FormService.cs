@@ -2,6 +2,7 @@ using System.Text.Json;
 using Cacahuate.DataAccess.Entities;
 using Cacahuate.DataAccess.Repositories;
 using Cacahuate.Services.Interfaces;
+using Cacahuate.Shared.DTOs.Common;
 using Cacahuate.Shared.DTOs.Forms;
 using Cacahuate.Shared.Enums;
 
@@ -53,6 +54,9 @@ public class FormService(
         var template = await formRepository.GetTemplateByIdAsync(request.FormTemplateId)
             ?? throw new KeyNotFoundException("Form template not found.");
 
+        if (await formRepository.AssignmentExistsAsync(request.PatientId, request.FormTemplateId))
+            throw new InvalidOperationException("This patient already has this template assigned.");
+
         var assignment = new FormAssignment
         {
             FormTemplateId = template.Id,
@@ -76,29 +80,55 @@ public class FormService(
         return assignments.Select(MapAssignment).ToList();
     }
 
-    public async Task<AppointmentFormResponse> GetFormForAppointmentAsync(Guid appointmentId)
+    public async Task<PagedResult<FormAssignmentResponse>> GetAllAssignmentsPagedAsync(int page, int pageSize, Guid? patientId)
+    {
+        var (items, totalCount) = await formRepository.GetAllAssignmentsPagedAsync(page, pageSize, patientId);
+        return new PagedResult<FormAssignmentResponse>
+        {
+            Items = items.Select(MapAssignment).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
+    public async Task<List<FormAssignmentResponse>> GetAssignmentsForTherapistAsync(Guid therapistUserId)
+    {
+        var therapist = await therapistRepository.GetByUserIdAsync(therapistUserId)
+            ?? throw new KeyNotFoundException("Therapist not found.");
+
+        var patientIds = await appointmentRepository.GetPatientIdsByTherapistIdAsync(therapist.Id);
+        var assignments = await formRepository.GetAssignmentsByPatientIdsAsync(patientIds);
+        return assignments.Select(MapAssignment).ToList();
+    }
+
+    public async Task<List<AppointmentFormResponse>> GetFormsForAppointmentAsync(Guid appointmentId)
     {
         var appointment = await appointmentRepository.GetByIdAsync(appointmentId)
             ?? throw new KeyNotFoundException("Appointment not found.");
 
-        var assignment = await formRepository.GetActiveAssignmentByPatientIdAsync(appointment.PatientId);
+        var appointmentDateTime = appointment.Date.ToDateTime(appointment.StartTime);
+        var assignments = (await formRepository.GetAssignmentsByPatientIdAsync(appointment.PatientId))
+            .Where(a => a.AssignedAt <= appointmentDateTime)
+            .ToList();
 
-        if (assignment == null)
-            return new AppointmentFormResponse { HasForm = false };
-
-        var submission = await formRepository.GetSubmissionByAppointmentIdAsync(appointmentId);
-
-        return new AppointmentFormResponse
+        var result = new List<AppointmentFormResponse>();
+        foreach (var assignment in assignments)
         {
-            HasForm = true,
-            AssignmentId = assignment.Id,
-            FormTemplateName = assignment.FormTemplate.Name,
-            FormTemplateDescription = assignment.FormTemplate.Description,
-            Notes = assignment.Notes,
-            Fields = assignment.FormTemplate.Fields.OrderBy(f => f.Order).Select(MapField).ToList(),
-            IsSubmitted = submission != null,
-            Submission = submission == null ? null : MapSubmission(submission, assignment.FormTemplate.Fields)
-        };
+            var submission = await formRepository.GetSubmissionByAppointmentAndAssignmentAsync(appointmentId, assignment.Id);
+            result.Add(new AppointmentFormResponse
+            {
+                AssignmentId = assignment.Id,
+                FormTemplateName = assignment.FormTemplate.Name,
+                FormTemplateDescription = assignment.FormTemplate.Description,
+                Notes = assignment.Notes,
+                Fields = assignment.FormTemplate.Fields.OrderBy(f => f.Order).Select(MapField).ToList(),
+                IsSubmitted = submission != null,
+                Submission = submission == null ? null : MapSubmission(submission, assignment.FormTemplate.Fields)
+            });
+        }
+
+        return result;
     }
 
     public async Task<FormSubmissionResponse> GetSubmissionByIdAsync(Guid submissionId)
@@ -112,12 +142,18 @@ public class FormService(
     public async Task<AppointmentFormResponse> SubmitFormAsync(
         Guid appointmentId, Guid assignmentId, SubmitFormRequest request, Guid therapistUserId)
     {
-        var existing = await formRepository.GetSubmissionByAppointmentIdAsync(appointmentId);
-        if (existing != null)
-            throw new InvalidOperationException("This appointment already has a submitted form.");
+        var appointment = await appointmentRepository.GetByIdAsync(appointmentId)
+            ?? throw new KeyNotFoundException("Appointment not found.");
 
         var assignment = await formRepository.GetAssignmentByIdAsync(assignmentId)
             ?? throw new KeyNotFoundException("Assignment not found.");
+
+        if (assignment.PatientId != appointment.PatientId)
+            throw new UnauthorizedAccessException("This form is not assigned to this appointment.");
+
+        var existing = await formRepository.GetSubmissionByAppointmentAndAssignmentAsync(appointmentId, assignmentId);
+        if (existing != null)
+            throw new InvalidOperationException("This form has already been submitted for this appointment.");
 
         var therapist = await therapistRepository.GetByUserIdAsync(therapistUserId)
             ?? throw new KeyNotFoundException("Therapist not found.");
@@ -137,12 +173,11 @@ public class FormService(
         await formRepository.AddSubmissionAsync(submission);
         await formRepository.SaveChangesAsync();
 
-        var saved = await formRepository.GetSubmissionByAppointmentIdAsync(appointmentId)!
+        var saved = await formRepository.GetSubmissionByAppointmentAndAssignmentAsync(appointmentId, assignmentId)
             ?? throw new InvalidOperationException("Failed to retrieve submission.");
 
         return new AppointmentFormResponse
         {
-            HasForm = true,
             AssignmentId = assignmentId,
             FormTemplateName = assignment.FormTemplate.Name,
             FormTemplateDescription = assignment.FormTemplate.Description,

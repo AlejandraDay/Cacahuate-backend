@@ -3,6 +3,7 @@ using System;
 using Cacahuate.DataAccess.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Cacahuate.DataAccess.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260716160023_AddTherapistAndSignatureToForms")]
+    partial class AddTherapistAndSignatureToForms
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -169,11 +172,16 @@ namespace Cacahuate.DataAccess.Migrations
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("TherapistId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("FormTemplateId");
 
                     b.HasIndex("PatientId");
+
+                    b.HasIndex("TherapistId");
 
                     b.ToTable("FormAssignments");
                 });
@@ -222,6 +230,12 @@ namespace Cacahuate.DataAccess.Migrations
 
                     b.Property<Guid>("FormAssignmentId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ParentSignature")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ParentSignedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("SubmittedAt")
                         .HasColumnType("timestamp with time zone");
@@ -584,9 +598,16 @@ namespace Cacahuate.DataAccess.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Cacahuate.DataAccess.Entities.Therapist", "Therapist")
+                        .WithMany()
+                        .HasForeignKey("TherapistId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("FormTemplate");
 
                     b.Navigation("Patient");
+
+                    b.Navigation("Therapist");
                 });
 
             modelBuilder.Entity("Cacahuate.DataAccess.Entities.FormField", b =>

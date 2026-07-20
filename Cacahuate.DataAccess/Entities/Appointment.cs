@@ -38,5 +38,5 @@ public class Appointment
     public Parent Parent { get; set; } = null!;
     public TherapistAvailability Availability { get; set; } = null!;
     public TherapistRating? Rating { get; set; }
-    public FormSubmission? FormSubmission { get; set; }
+    public List<FormSubmission> FormSubmissions { get; set; } = [];
 }
