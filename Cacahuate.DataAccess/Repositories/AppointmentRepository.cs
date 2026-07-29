@@ -121,6 +121,44 @@ public class AppointmentRepository(AppDbContext db) : IAppointmentRepository
             .ToList();
     }
 
+    public async Task<(List<(Guid Id, string Name, DateOnly DateOfBirth, string? ParentName, int TotalAppointments, int CompletedAppointments, DateOnly? LastAppointmentDate)> Items, int TotalCount)> GetPatientSummariesForTherapistPagedAsync(Guid therapistId, int page, int pageSize)
+    {
+        var results = await db.Appointments
+            .Where(a => a.TherapistId == therapistId)
+            .Include(a => a.Patient).ThenInclude(p => p.Parent).ThenInclude(pp => pp.User)
+            .Select(a => new
+            {
+                a.PatientId,
+                a.Patient.FirstName,
+                a.Patient.LastName,
+                a.Patient.DateOfBirth,
+                ParentFirstName = a.Patient.Parent.User.FirstName,
+                ParentLastName = a.Patient.Parent.User.LastName,
+                a.Status,
+                a.Date,
+            })
+            .ToListAsync();
+
+        var grouped = results
+            .GroupBy(r => r.PatientId)
+            .Select(g => (
+                Id: g.Key,
+                Name: $"{g.First().FirstName} {g.First().LastName}",
+                DateOfBirth: g.First().DateOfBirth,
+                ParentName: (string?)$"{g.First().ParentFirstName} {g.First().ParentLastName}",
+                TotalAppointments: g.Count(),
+                CompletedAppointments: g.Count(r => r.Status == AppointmentStatus.Completed),
+                LastAppointmentDate: g.Max(r => (DateOnly?)r.Date)
+            ))
+            .OrderByDescending(g => g.LastAppointmentDate)
+            .ToList();
+
+        var totalCount = grouped.Count;
+        var items = grouped.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+        return (items, totalCount);
+    }
+
     public Task<bool> SlotIsBookedAsync(Guid availabilityId, TimeOnly startTime) =>
         db.Appointments.AnyAsync(a =>
             a.AvailabilityId == availabilityId &&

@@ -16,6 +16,7 @@ public interface IAppointmentRepository
         AppointmentStatus? status, DateOnly? dateFrom, DateOnly? dateTo);
     Task<List<(Guid Id, string Name)>> GetDistinctTherapistsForPatientAsync(Guid patientId);
     Task<List<(Guid Id, string Name)>> GetDistinctPatientsForTherapistAsync(Guid therapistId);
+    Task<(List<(Guid Id, string Name, DateOnly DateOfBirth, string? ParentName, int TotalAppointments, int CompletedAppointments, DateOnly? LastAppointmentDate)> Items, int TotalCount)> GetPatientSummariesForTherapistPagedAsync(Guid therapistId, int page, int pageSize);
     Task<bool> SlotIsBookedAsync(Guid availabilityId, TimeOnly startTime);
     Task AddAsync(Appointment appointment);
     Task SaveChangesAsync();

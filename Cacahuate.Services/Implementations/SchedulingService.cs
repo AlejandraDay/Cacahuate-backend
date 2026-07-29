@@ -628,6 +628,33 @@ public class SchedulingService(
         }).ToList();
     }
 
+    public async Task<RatingsPagedResponse> GetTherapistRatingsPagedAsync(Guid therapistId, int page, int pageSize)
+    {
+        var therapist = await therapistRepository.GetByIdAsync(therapistId)
+            ?? throw new KeyNotFoundException("Therapist not found.");
+
+        var (items, totalCount, averageStars) = await ratingRepository.GetByTherapistPagedAsync(therapistId, page, pageSize);
+        return new RatingsPagedResponse
+        {
+            Items = items.Select(r => new RatingResponse
+            {
+                Id = r.Id,
+                AppointmentId = r.AppointmentId,
+                TherapistId = therapist.Id,
+                TherapistName = $"{therapist.User.FirstName} {therapist.User.LastName}",
+                ParentId = r.ParentId,
+                ParentName = $"{r.Parent.User.FirstName} {r.Parent.User.LastName}",
+                Stars = r.Stars,
+                Comment = r.Comment,
+                CreatedAt = r.CreatedAt
+            }).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize,
+            AverageStars = averageStars,
+        };
+    }
+
     public async Task<List<RatingResponse>> GetMyRatingsAsync(Guid therapistUserId)
     {
         var therapist = await therapistRepository.GetByUserIdAsync(therapistUserId)
@@ -792,6 +819,27 @@ public class SchedulingService(
     {
         var results = await appointmentRepository.GetDistinctPatientsForTherapistAsync(therapistId);
         return results.Select(r => new NameLookupResponse { Id = r.Id, Name = r.Name }).ToList();
+    }
+
+    public async Task<PagedResult<TherapistPatientSummaryResponse>> GetPatientSummariesForTherapistAsync(Guid therapistId, int page, int pageSize)
+    {
+        var (items, totalCount) = await appointmentRepository.GetPatientSummariesForTherapistPagedAsync(therapistId, page, pageSize);
+        return new PagedResult<TherapistPatientSummaryResponse>
+        {
+            Items = items.Select(r => new TherapistPatientSummaryResponse
+            {
+                Id = r.Id,
+                Name = r.Name,
+                DateOfBirth = r.DateOfBirth,
+                ParentName = r.ParentName,
+                TotalAppointments = r.TotalAppointments,
+                CompletedAppointments = r.CompletedAppointments,
+                LastAppointmentDate = r.LastAppointmentDate,
+            }).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize,
+        };
     }
 
     // â"€â"€ Helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€

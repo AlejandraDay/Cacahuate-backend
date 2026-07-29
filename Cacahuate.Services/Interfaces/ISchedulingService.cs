@@ -26,6 +26,7 @@ public interface ISchedulingService
         AppointmentStatus? status, DateOnly? dateFrom, DateOnly? dateTo);
     Task<List<NameLookupResponse>> GetDistinctTherapistsForPatientAsync(Guid patientId);
     Task<List<NameLookupResponse>> GetDistinctPatientsForTherapistAsync(Guid therapistId);
+    Task<PagedResult<TherapistPatientSummaryResponse>> GetPatientSummariesForTherapistAsync(Guid therapistId, int page, int pageSize);
     Task<PatientResponse> AddPatientAsync(Guid parentUserId, PatientRequest request);
     Task<List<PatientResponse>> GetPatientsByParentAsync(Guid parentUserId);
     Task<List<PatientResponse>> GetAllPatientsAsync();
@@ -34,6 +35,7 @@ public interface ISchedulingService
     Task<AppointmentResponse> AddProgressNotesAsync(Guid appointmentId, Guid therapistUserId, ProgressRequest request);
     Task<RatingResponse> RateTherapistAsync(Guid appointmentId, Guid parentUserId, RatingRequest request);
     Task<List<RatingResponse>> GetTherapistRatingsAsync(Guid therapistId);
+    Task<RatingsPagedResponse> GetTherapistRatingsPagedAsync(Guid therapistId, int page, int pageSize);
     Task<List<RatingResponse>> GetMyRatingsAsync(Guid therapistUserId);
     Task<AppointmentResponse> SignAppointmentAsync(Guid appointmentId, Guid userId, string role, SignAppointmentRequest request);
 }

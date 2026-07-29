@@ -6,6 +6,7 @@ public interface IRatingRepository
 {
     Task<TherapistRating?> GetByAppointmentAsync(Guid appointmentId);
     Task<List<TherapistRating>> GetByTherapistAsync(Guid therapistId);
+    Task<(List<TherapistRating> Items, int TotalCount, double? AverageStars)> GetByTherapistPagedAsync(Guid therapistId, int page, int pageSize);
     Task AddAsync(TherapistRating rating);
     Task SaveChangesAsync();
 }

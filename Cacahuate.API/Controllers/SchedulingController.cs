@@ -220,6 +220,16 @@ public class SchedulingController(ISchedulingService schedulingService) : Contro
         return Ok(result);
     }
 
+    // Admin: patients treated by a therapist, with summary stats (for therapist detail page)
+    [HttpGet("appointments/therapist/{therapistId}/patients/summary")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<PagedResult<TherapistPatientSummaryResponse>>> GetPatientSummariesForTherapist(
+        Guid therapistId, [FromQuery] int page = 1, [FromQuery] int pageSize = 12)
+    {
+        var result = await schedulingService.GetPatientSummariesForTherapistAsync(therapistId, page, pageSize);
+        return Ok(result);
+    }
+
     // Therapist: add progress notes to a completed appointment
     [HttpPatch("appointments/{appointmentId}/progress")]
     [Authorize(Roles = "Therapist")]
@@ -243,6 +253,16 @@ public class SchedulingController(ISchedulingService schedulingService) : Contro
     public async Task<ActionResult<List<RatingResponse>>> GetTherapistRatings(Guid therapistId)
     {
         var result = await schedulingService.GetTherapistRatingsAsync(therapistId);
+        return Ok(result);
+    }
+
+    // Admin: view a therapist's ratings, paginated
+    [HttpGet("therapists/{therapistId}/ratings/paged")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<RatingsPagedResponse>> GetTherapistRatingsPaged(
+        Guid therapistId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        var result = await schedulingService.GetTherapistRatingsPagedAsync(therapistId, page, pageSize);
         return Ok(result);
     }
 
