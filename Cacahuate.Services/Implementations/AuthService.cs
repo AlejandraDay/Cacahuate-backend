@@ -34,8 +34,45 @@ public class AuthService(
 
     public async Task<LoginResponse> RegisterAsync(RegisterRequest request)
     {
+        var user = await RegisterCoreAsync(request, isAdminCreated: false);
+        return await BuildLoginResponse(user);
+    }
+
+    public async Task<AdminCreatedUserResponse> CreateParentAsync(RegisterRequest request)
+    {
+        request.Role = UserRole.Parent;
+        var user = await RegisterCoreAsync(request, isAdminCreated: true);
+
+        return new AdminCreatedUserResponse
+        {
+            Id = user.Id,
+            Email = user.Email,
+            FirstName = user.FirstName,
+            LastName = user.LastName
+        };
+    }
+
+    public async Task<AdminCreatedUserResponse> CreateTherapistAsync(RegisterRequest request)
+    {
+        request.Role = UserRole.Therapist;
+        var user = await RegisterCoreAsync(request, isAdminCreated: true);
+
+        return new AdminCreatedUserResponse
+        {
+            Id = user.Id,
+            Email = user.Email,
+            FirstName = user.FirstName,
+            LastName = user.LastName
+        };
+    }
+
+    private async Task<User> RegisterCoreAsync(RegisterRequest request, bool isAdminCreated = false)
+    {
         if (request.Role == UserRole.Admin)
             throw new InvalidOperationException("Self-registration as Admin is not allowed.");
+
+        if (!isAdminCreated && request.Role == UserRole.Parent)
+            throw new InvalidOperationException("Self-registration as Parent is not allowed.");
 
         var existing = await userRepository.GetByEmailAsync(request.Email);
         if (existing is not null)
@@ -64,7 +101,7 @@ public class AuthService(
             await parentRepository.SaveChangesAsync();
         }
 
-        return await BuildLoginResponse(user);
+        return user;
     }
 
     public async Task<LoginResponse> RefreshAsync(RefreshTokenRequest request)

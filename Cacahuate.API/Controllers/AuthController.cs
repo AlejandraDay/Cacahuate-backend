@@ -1,5 +1,6 @@
 using Cacahuate.Services.Interfaces;
 using Cacahuate.Shared.DTOs.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Cacahuate.API.Controllers;
@@ -19,6 +20,36 @@ public class AuthController(IAuthService authService) : ControllerBase
         catch (InvalidOperationException ex)
         {
             return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("admin/create-parent")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<AdminCreatedUserResponse>> CreateParent([FromBody] RegisterRequest request)
+    {
+        try
+        {
+            var response = await authService.CreateParentAsync(request);
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("admin/create-therapist")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<AdminCreatedUserResponse>> CreateTherapist([FromBody] RegisterRequest request)
+    {
+        try
+        {
+            var response = await authService.CreateTherapistAsync(request);
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
     }
 

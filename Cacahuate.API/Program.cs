@@ -2,6 +2,7 @@ using System.Text;
 using Cacahuate.DataAccess.Context;
 using Cacahuate.DataAccess.Repositories;
 using Cacahuate.DataAccess.Seeders;
+using Cacahuate.Services.Seeders;
 using Cacahuate.Services.Implementations;
 using Cacahuate.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -89,6 +90,12 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await FormTemplateSeeder.SeedAsync(db);
+
+    if (app.Environment.IsDevelopment())
+    {
+        var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
+        await DemoDataSeeder.SeedAsync(db, authService);
+    }
 }
 
 app.UseCors("AllowAll");

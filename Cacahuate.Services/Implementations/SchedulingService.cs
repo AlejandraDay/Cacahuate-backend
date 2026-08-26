@@ -443,10 +443,10 @@ public class SchedulingService(
 
     // â"€â"€ Patients â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-    public async Task<PatientResponse> AddPatientAsync(Guid parentUserId, PatientRequest request)
+    public async Task<PatientResponse> AddPatientAsAdminAsync(AdminCreatePatientRequest request)
     {
-        var parent = await parentRepository.GetByUserIdAsync(parentUserId)
-            ?? throw new KeyNotFoundException("Parent not found.");
+        var parent = await parentRepository.GetByUserIdAsync(request.ParentUserId)
+            ?? throw new KeyNotFoundException("Parent not found for the given user id.");
 
         var patient = new Patient
         {
@@ -511,6 +511,23 @@ public class SchedulingService(
         var patient = await patientRepository.GetByIdAsync(patientId)
             ?? throw new KeyNotFoundException("Patient not found.");
         return MapToPatientResponse(patient);
+    }
+
+    public async Task<PagedResult<ParentSummaryResponse>> GetAllParentsPagedAsync(int page, int pageSize, string? search)
+    {
+        var (items, totalCount) = await parentRepository.GetAllPagedAsync(page, pageSize, search);
+        return new PagedResult<ParentSummaryResponse>
+        {
+            Items = items.Select(p => new ParentSummaryResponse
+            {
+                Id = p.UserId,
+                FullName = $"{p.User.FirstName} {p.User.LastName}",
+                Email = p.User.Email
+            }).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
     }
 
     private static PatientResponse MapToPatientResponse(Patient p) => new()

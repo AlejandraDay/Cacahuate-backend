@@ -27,11 +27,12 @@ public interface ISchedulingService
     Task<List<NameLookupResponse>> GetDistinctTherapistsForPatientAsync(Guid patientId);
     Task<List<NameLookupResponse>> GetDistinctPatientsForTherapistAsync(Guid therapistId);
     Task<PagedResult<TherapistPatientSummaryResponse>> GetPatientSummariesForTherapistAsync(Guid therapistId, int page, int pageSize);
-    Task<PatientResponse> AddPatientAsync(Guid parentUserId, PatientRequest request);
+    Task<PatientResponse> AddPatientAsAdminAsync(AdminCreatePatientRequest request);
     Task<List<PatientResponse>> GetPatientsByParentAsync(Guid parentUserId);
     Task<List<PatientResponse>> GetAllPatientsAsync();
     Task<PagedResult<PatientResponse>> GetAllPatientsPagedAsync(int page, int pageSize, string? search);
     Task<PatientResponse> GetPatientByIdAsync(Guid patientId);
+    Task<PagedResult<ParentSummaryResponse>> GetAllParentsPagedAsync(int page, int pageSize, string? search);
     Task<AppointmentResponse> AddProgressNotesAsync(Guid appointmentId, Guid therapistUserId, ProgressRequest request);
     Task<RatingResponse> RateTherapistAsync(Guid appointmentId, Guid parentUserId, RatingRequest request);
     Task<List<RatingResponse>> GetTherapistRatingsAsync(Guid therapistId);

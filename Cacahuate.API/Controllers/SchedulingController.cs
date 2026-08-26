@@ -115,12 +115,22 @@ public class SchedulingController(ISchedulingService schedulingService) : Contro
         return Ok(result);
     }
 
-    // Parent: add a patient
-    [HttpPost("patients")]
-    [Authorize(Roles = "Parent")]
-    public async Task<ActionResult<PatientResponse>> AddPatient([FromBody] PatientRequest request)
+    // Admin: create a patient for an explicit parent
+    [HttpPost("admin/patients")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<PatientResponse>> AddPatientAsAdmin([FromBody] AdminCreatePatientRequest request)
     {
-        var result = await schedulingService.AddPatientAsync(CurrentUserId, request);
+        var result = await schedulingService.AddPatientAsAdminAsync(request);
+        return Ok(result);
+    }
+
+    // Admin: list all parents (paginated, searchable) for pickers
+    [HttpGet("admin/parents")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<PagedResult<ParentSummaryResponse>>> GetAllParents(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? search = null)
+    {
+        var result = await schedulingService.GetAllParentsPagedAsync(page, pageSize, search);
         return Ok(result);
     }
 
