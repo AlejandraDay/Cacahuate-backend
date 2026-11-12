@@ -81,6 +81,29 @@ public class SchedulingService(
         return MapToAvailabilityResponse(availability, availability.Therapist, slots);
     }
 
+    public async Task DeleteAvailabilityAsync(Guid therapistUserId, Guid availabilityId)
+    {
+        var therapist = await therapistRepository.GetByUserIdAsync(therapistUserId)
+            ?? throw new KeyNotFoundException("Therapist not found.");
+
+        var availability = await availabilityRepository.GetByIdAsync(availabilityId)
+            ?? throw new KeyNotFoundException("Availability block not found.");
+
+        if (availability.TherapistId != therapist.Id)
+            throw new UnauthorizedAccessException("No puedes eliminar un bloque de otro terapeuta.");
+
+        // Appointments reference the block with DeleteBehavior.Restrict, so any appointment
+        // (even a cancelled one, which keeps its history) prevents deletion.
+        if (availability.Appointments.Any(a => a.Status != AppointmentStatus.Cancelled))
+            throw new InvalidOperationException("No se puede eliminar: el bloque tiene citas activas. Cancélalas primero.");
+
+        if (availability.Appointments.Count > 0)
+            throw new InvalidOperationException("No se puede eliminar: el bloque tiene historial de citas canceladas.");
+
+        availabilityRepository.Remove(availability);
+        await availabilityRepository.SaveChangesAsync();
+    }
+
     // â"€â"€ Appointments â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
     public async Task<AppointmentResponse> BookAppointmentAsync(Guid parentUserId, BookAppointmentRequest request)

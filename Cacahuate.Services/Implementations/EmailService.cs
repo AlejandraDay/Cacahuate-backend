@@ -25,6 +25,13 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger) :
             return;
         }
 
+        if (string.IsNullOrEmpty(host) || string.IsNullOrEmpty(fromEmail))
+        {
+            logger.LogWarning(
+                "Email not sent to {Email}: Email:Host and Email:From must be configured.", toEmail);
+            return;
+        }
+
         try
         {
             var port = int.TryParse(portStr, out var p) ? p : 587;

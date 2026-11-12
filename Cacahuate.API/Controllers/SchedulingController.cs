@@ -52,6 +52,30 @@ public class SchedulingController(ISchedulingService schedulingService) : Contro
         return Ok(result);
     }
 
+    // Therapist: delete own availability block (only if it has no appointments)
+    [HttpDelete("availability/{availabilityId}")]
+    [Authorize(Roles = "Therapist")]
+    public async Task<IActionResult> DeleteAvailability(Guid availabilityId)
+    {
+        try
+        {
+            await schedulingService.DeleteAvailabilityAsync(CurrentUserId, availabilityId);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
     // Parent: book an appointment
     [HttpPost("appointments")]
     [Authorize(Roles = "Parent")]

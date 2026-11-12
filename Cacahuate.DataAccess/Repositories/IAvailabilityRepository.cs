@@ -8,5 +8,6 @@ public interface IAvailabilityRepository
     Task<List<TherapistAvailability>> GetByTherapistAndDateAsync(Guid therapistId, DateOnly date);
     Task<List<TherapistAvailability>> GetByTherapistAsync(Guid therapistId);
     Task AddAsync(TherapistAvailability availability);
+    void Remove(TherapistAvailability availability);
     Task SaveChangesAsync();
 }

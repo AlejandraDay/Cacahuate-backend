@@ -28,5 +28,8 @@ public class AvailabilityRepository(AppDbContext db) : IAvailabilityRepository
     public async Task AddAsync(TherapistAvailability availability) =>
         await db.TherapistAvailabilities.AddAsync(availability);
 
+    public void Remove(TherapistAvailability availability) =>
+        db.TherapistAvailabilities.Remove(availability);
+
     public Task SaveChangesAsync() => db.SaveChangesAsync();
 }

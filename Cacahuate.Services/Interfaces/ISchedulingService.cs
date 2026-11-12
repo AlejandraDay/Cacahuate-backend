@@ -10,6 +10,7 @@ public interface ISchedulingService
     Task<List<AvailabilityResponse>> GetTherapistAvailabilityAsync(Guid therapistId);
     Task<List<AvailabilityResponse>> GetMyAvailabilityAsync(Guid therapistUserId);
     Task<AvailabilityResponse> GetAvailabilityWithSlotsAsync(Guid availabilityId);
+    Task DeleteAvailabilityAsync(Guid therapistUserId, Guid availabilityId);
     Task<AppointmentResponse> BookAppointmentAsync(Guid parentUserId, BookAppointmentRequest request);
     Task<List<AppointmentResponse>> GetAppointmentsByParentAsync(Guid parentUserId);
     Task<List<AppointmentResponse>> GetAppointmentsByTherapistAsync(Guid therapistUserId);
